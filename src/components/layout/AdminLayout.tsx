@@ -34,14 +34,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
-  // Critical Loading Check: Wait for EVERYTHING before deciding to redirect
+  // Critical Loading Check: Only make a decision once loading has completely stopped
   const isSyncing = isUserLoading || (!!user && isProfileLoading);
   
   const role = userProfile?.role;
   const isAdmin = role === 'Admin' || role === 'Librarian';
 
   useEffect(() => {
-    // Only make a decision once loading has completely stopped
     if (!isSyncing) {
       if (!user || !isAdmin) {
         // Redirect back to login if not authorized
@@ -70,7 +69,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  // Final safety check to ensure we don't flash content if unauthorized
   if (!user || !isAdmin) {
     return null;
   }

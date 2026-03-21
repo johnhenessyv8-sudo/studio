@@ -53,13 +53,10 @@ export default function AdminLogin() {
       const isAdmin = role === 'Admin' || role === 'Librarian';
       
       if (isAdmin) {
-        // Redirect only if authorized
         router.replace('/admin/dashboard');
       } else if (userProfile) {
-        // Explicitly set error if profile exists but role is wrong
         setAuthError(`Access Denied. Your profile exists, but your role is "${role || 'None'}". Authorized roles: "Admin", "Librarian".`);
       } else {
-        // Explicitly set error if profile is missing
         setAuthError(`Profile Not Found. No Firestore document found for UID "${user.uid}" in the 'users' collection.`);
       }
     }
@@ -85,10 +82,9 @@ export default function AdminLogin() {
     try {
       await signInWithPopup(auth, provider);
     } catch (error: any) {
-      console.error("Auth Error:", error);
       if (error.code === 'auth/invalid-credential') {
-        setAuthError(`Auth Failed: 'invalid-credential'. This domain might not be authorized yet.`);
-      } else if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
+        setAuthError(`Auth Failed: 'invalid-credential'. Domain authorization missing.`);
+      } else if (error.code !== 'auth/popup-closed-by-user') {
         setAuthError(error.message);
       }
     } finally {
@@ -109,13 +105,12 @@ export default function AdminLogin() {
     }
   };
 
-  // Critical Loading State: Wait for both auth and profile to resolve if user exists
   if (isUserLoading || (user && isProfileLoading)) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
         <h2 className="text-xl font-bold font-headline">Checking Authorization</h2>
-        <p className="text-muted-foreground mt-2 italic">Verifying your role in Firestore...</p>
+        <p className="text-muted-foreground mt-2 italic">Verifying your role...</p>
       </div>
     );
   }
@@ -139,7 +134,6 @@ export default function AdminLogin() {
             <p className="text-muted-foreground italic">New Era University Library</p>
           </div>
 
-          {/* Diagnostic Info Box */}
           <div className="mb-6 p-4 bg-secondary/50 rounded-2xl border border-primary/10 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
@@ -150,7 +144,7 @@ export default function AdminLogin() {
               {currentOrigin || 'Detecting...'}
             </code>
             <p className="text-[9px] text-muted-foreground leading-relaxed italic">
-              Add the hostname above to <strong>Authorized Domains</strong> in Firebase Console. (Remove https:// and trailing slashes).
+              Ensure this hostname is in <strong>Authorized Domains</strong> in Firebase Console (Authentication &gt; Settings).
             </p>
           </div>
 
@@ -160,17 +154,15 @@ export default function AdminLogin() {
               <AlertTitle className="font-bold">Access Check Failed</AlertTitle>
               <AlertDescription className="text-xs mt-2 space-y-3">
                 <p>{authError}</p>
-                
                 {user && (
                   <div className="pt-2 border-t border-destructive/20">
-                    <p className="font-bold mb-1">Your Account UID:</p>
+                    <p className="font-bold mb-1">Your UID:</p>
                     <div className="flex items-center gap-2">
                       <code className="bg-background/50 p-1.5 rounded flex-1 truncate font-mono text-[10px]">{user.uid}</code>
                       <Button size="icon" variant="outline" className="h-8 w-8 shrink-0" onClick={() => copyToClipboard(user.uid)}>
                         {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                       </Button>
                     </div>
-                    <p className="mt-2 opacity-70 italic">Verify document in Firestore exists with <strong>role: "Admin"</strong>.</p>
                   </div>
                 )}
               </AlertDescription>
@@ -234,12 +226,6 @@ export default function AdminLogin() {
               </form>
             </TabsContent>
           </Tabs>
-
-          <div className="mt-8 pt-6 border-t border-muted/20 text-center">
-            <p className="text-sm text-muted-foreground italic">
-              Authorized Personnel Only
-            </p>
-          </div>
         </div>
       </div>
     </div>
