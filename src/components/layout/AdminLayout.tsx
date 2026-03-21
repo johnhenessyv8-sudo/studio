@@ -32,14 +32,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
 
-  const { data: userProfile } = useDoc(userDocRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
-  // Guarded redirect: Only redirect to login if loading is finished AND no user exists
+  // Guarded redirect: Redirect if not logged in OR if profile doesn't have allowed role
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.replace('/admin/login');
+    } else if (!isUserLoading && user && !isProfileLoading) {
+      // If profile exists but role is not Admin or Librarian, send back to login
+      if (!userProfile || (userProfile.role !== 'Admin' && userProfile.role !== 'Librarian')) {
+        router.replace('/admin/login');
+      }
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading, userProfile, isProfileLoading, router]);
 
   const handleLogout = async () => {
     if (!auth) return;
@@ -51,20 +56,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   };
 
-  // While checking auth state, show a consistent full-page loader
-  if (isUserLoading) {
+  // While checking auth state or profile role, show a consistent full-page loader
+  if (isUserLoading || (user && isProfileLoading)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-12 h-12 text-primary animate-spin" />
-          <p className="text-muted-foreground font-bold tracking-tight">Restoring session...</p>
+          <p className="text-muted-foreground font-bold tracking-tight">Verifying credentials...</p>
         </div>
       </div>
     );
   }
 
-  // If auth loading finished and no user, return nothing while redirect effect triggers
-  if (!user) {
+  // If role is not valid, don't show the layout
+  if (!user || !userProfile || (userProfile.role !== 'Admin' && userProfile.role !== 'Librarian')) {
     return null;
   }
 
@@ -118,7 +123,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="pt-6 border-t space-y-4">
           <div className="px-4">
             <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-1">Signed in as</p>
-            <p className="text-sm font-bold truncate text-primary">{user.displayName || userProfile?.fullName || user.email || 'Staff'}</p>
+            <p className="text-sm font-bold truncate text-primary">{userProfile?.fullName || user.displayName || user.email}</p>
+            <p className="text-[10px] text-muted-foreground uppercase font-black">{userProfile?.role}</p>
           </div>
           <Button 
             variant="ghost" 

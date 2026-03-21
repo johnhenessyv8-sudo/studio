@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, ShieldCheck, Chrome, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
-import { useAuth, useUser, useFirestore } from '@/firebase';
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { 
   GoogleAuthProvider, 
   signInWithPopup, 
@@ -34,14 +34,24 @@ export default function AdminLogin() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // Guarded redirect: Wait until auth state is fully determined
+  // Use the useDoc hook to reactively check the user's role in Firestore
+  const userDocRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
+
+  // Handle redirects based on both Auth state AND Firestore role
   useEffect(() => {
-    if (!isUserLoading) {
-      if (user) {
+    if (!isUserLoading && user && !isProfileLoading) {
+      if (userProfile && (userProfile.role === 'Admin' || userProfile.role === 'Librarian')) {
         router.replace('/admin/dashboard');
+      } else if (userProfile && userProfile.role !== 'Admin' && userProfile.role !== 'Librarian') {
+        setAuthError(`Access Denied. Your account is not authorized as an Admin or Librarian. (UID: ${user.uid})`);
       }
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading, userProfile, isProfileLoading, router]);
 
   const handleGoogleLogin = async () => {
     if (!auth || !firestore) return;
@@ -57,37 +67,26 @@ export default function AdminLogin() {
       const loggedUser = result.user;
 
       if (loggedUser.email?.toLowerCase().endsWith('@neu.edu.ph')) {
+        // Sync user profile but don't overwrite role if it already exists
         const userRef = doc(firestore, 'users', loggedUser.uid);
         await setDoc(userRef, {
           id: loggedUser.uid,
           fullName: loggedUser.displayName,
           institutionalEmail: loggedUser.email,
-          isActive: true,
           updatedAt: serverTimestamp(),
         }, { merge: true });
 
         toast({
           title: "Signed in successfully",
-          description: `Welcome, ${loggedUser.displayName}!`
+          description: "Checking permissions..."
         });
-        // The useEffect will handle the redirect
       } else {
         await auth.signOut();
         setAuthError("Only @neu.edu.ph institutional accounts are allowed.");
-        toast({
-          variant: "destructive",
-          title: "Access Restricted",
-          description: "Only @neu.edu.ph institutional accounts are allowed."
-        });
       }
     } catch (error: any) {
       if (error.code !== 'auth/popup-closed-by-user') {
         setAuthError(error.message);
-        toast({
-          variant: "destructive",
-          title: "Login failed",
-          description: error.message
-        });
       }
     } finally {
       setIsGoogleLoading(false);
@@ -104,31 +103,23 @@ export default function AdminLogin() {
       await signInWithEmailAndPassword(auth, email, password);
       toast({
         title: "Signed in",
-        description: "Welcome back."
+        description: "Checking permissions..."
       });
     } catch (error: any) {
       setAuthError(error.message);
-      toast({
-        variant: "destructive",
-        title: "Login failed",
-        description: error.message
-      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isUserLoading) {
+  if (isUserLoading || (user && isProfileLoading)) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
         <Loader2 className="w-10 h-10 text-primary animate-spin" />
-        <p className="mt-4 text-muted-foreground font-bold tracking-tight">Restoring session...</p>
+        <p className="mt-4 text-muted-foreground font-bold tracking-tight">Authenticating...</p>
       </div>
     );
   }
-
-  // If user is already logged in, show nothing while the redirect effect triggers
-  if (user) return null;
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
@@ -146,14 +137,16 @@ export default function AdminLogin() {
 
           <div className="text-center mb-8">
             <h1 className="text-3xl font-black tracking-tight mb-2">Admin Portal</h1>
-            <p className="text-muted-foreground">Login to access the dashboard.</p>
+            <p className="text-muted-foreground">Authorized access only.</p>
           </div>
 
           {authError && (
             <Alert variant="destructive" className="mb-6">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Authentication Error</AlertTitle>
-              <AlertDescription>{authError}</AlertDescription>
+              <AlertTitle>Permission Denied</AlertTitle>
+              <AlertDescription className="text-xs break-all">
+                {authError}
+              </AlertDescription>
             </Alert>
           )}
 
@@ -223,7 +216,7 @@ export default function AdminLogin() {
 
           <div className="mt-8 pt-6 border-t border-muted/20 text-center">
             <p className="text-sm text-muted-foreground italic">
-              Authorized NEU institutional accounts only.
+              Institutional accounts with valid roles only.
             </p>
           </div>
         </div>
