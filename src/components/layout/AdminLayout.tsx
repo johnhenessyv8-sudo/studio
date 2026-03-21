@@ -42,6 +42,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (!firestore) return;
 
       try {
+        // Find profile by current UID or email fallback
         const userDocRef = doc(firestore, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
         
@@ -50,6 +51,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (userSnap.exists()) {
           profileData = userSnap.data();
         } else if (user.email) {
+          // Fallback to searching by institutional email to handle provider switching
           const q = query(
             collection(firestore, 'users'), 
             where('institutionalEmail', '==', user.email.toLowerCase())
@@ -60,6 +62,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             const foundDoc = querySnap.docs[0];
             profileData = foundDoc.data();
             
+            // Sync the ID field to the current provider's UID
             await updateDoc(foundDoc.ref, {
               id: user.uid,
               updatedAt: serverTimestamp()
