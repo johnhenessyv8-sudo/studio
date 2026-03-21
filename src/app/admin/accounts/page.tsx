@@ -83,13 +83,14 @@ export default function AccountManagement() {
     try {
       // 1. Create Auth Account with default password 'mypassword123'
       // We use a secondary Firebase instance to avoid logging out the current admin
-      const secondaryApp = initializeApp(firebaseConfig, `secondary-${Date.now()}`);
+      const secondaryAppName = `secondary-app-${Date.now()}`;
+      const secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
       const secondaryAuth = getAuth(secondaryApp);
       
       const authUser = await createUserWithEmailAndPassword(secondaryAuth, formData.email.toLowerCase(), "mypassword123");
       const uid = authUser.user.uid;
 
-      // Clean up secondary instance immediately
+      // Clean up secondary instance
       await signOut(secondaryAuth);
       await deleteApp(secondaryApp);
 
@@ -111,7 +112,7 @@ export default function AccountManagement() {
 
       toast({
         title: "User Created",
-        description: `${formData.fullName} added with password: mypassword123`
+        description: `${formData.fullName} added. Default password: mypassword123`
       });
       
       setIsDialogOpen(false);
@@ -187,7 +188,7 @@ export default function AccountManagement() {
                 <DialogHeader>
                   <DialogTitle>Add New User</DialogTitle>
                   <DialogDescription>
-                    Account will be created with default password: <b>mypassword123</b>
+                    Account will be created in Auth with default password: <b>mypassword123</b>
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleAddUser} className="space-y-4 py-4">

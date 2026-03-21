@@ -45,7 +45,7 @@ export default function AdminLogin() {
         
         let profile = userSnap.exists() ? userSnap.data() : null;
 
-        // Attempt 2: Fallback to email search
+        // Attempt 2: Fallback to email search (Crucial for linking newly added librarians)
         if (!profile && user.email) {
           const q = query(
             collection(firestore, 'users'), 
@@ -55,7 +55,7 @@ export default function AdminLogin() {
           if (!querySnap.empty) {
             const foundDoc = querySnap.docs[0];
             profile = foundDoc.data();
-            // Automatically link UID to this record
+            // Automatically link UID to this pre-registered record
             await updateDoc(foundDoc.ref, {
               id: user.uid,
               updatedAt: serverTimestamp()
@@ -71,7 +71,7 @@ export default function AdminLogin() {
             setAuthError(`Access Denied: Your profile role is "${profile.role}". Administrative privileges required.`);
           }
         } else {
-          setAuthError(`No library profile found for ${user.email}. Please ensure your account is pre-registered in the database.`);
+          setAuthError(`No library profile found for ${user.email}. Please ensure your account is registered in the database.`);
         }
       } catch (err: any) {
         setAuthError(err.message);
@@ -111,10 +111,10 @@ export default function AdminLogin() {
     setIsSubmitting(true);
     setAuthError(null);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, email.toLowerCase(), password);
     } catch (error: any) {
       if (error.code === 'auth/invalid-credential') {
-        setAuthError("Authentication Failed: The email or password provided is incorrect. Please verify your password in the Firebase Console.");
+        setAuthError("Authentication Failed: The email or password provided is incorrect.");
       } else {
         setAuthError(error.message);
       }
@@ -126,8 +126,8 @@ export default function AdminLogin() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-        <h2 className="text-xl font-bold font-headline">Authenticating...</h2>
-        <p className="text-muted-foreground mt-2 italic">Verifying your portal access</p>
+        <h2 className="text-xl font-bold font-headline">Verifying Portal Access...</h2>
+        <p className="text-muted-foreground mt-2 italic">Checking credentials</p>
       </div>
     );
   }
