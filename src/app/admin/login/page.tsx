@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, ShieldCheck, Chrome, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Chrome, Mail, Lock, Loader2, AlertCircle, Copy, Check } from 'lucide-react';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { 
   GoogleAuthProvider, 
@@ -33,6 +33,7 @@ export default function AdminLogin() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Use the useDoc hook to reactively check the user's role in Firestore
   const userDocRef = useMemoFirebase(() => {
@@ -47,11 +48,23 @@ export default function AdminLogin() {
     if (!isUserLoading && user && !isProfileLoading) {
       if (userProfile && (userProfile.role === 'Admin' || userProfile.role === 'Librarian')) {
         router.replace('/admin/dashboard');
-      } else if (userProfile && userProfile.role !== 'Admin' && userProfile.role !== 'Librarian') {
-        setAuthError(`Access Denied. Your account is not authorized as an Admin or Librarian. (UID: ${user.uid})`);
+      } else if (userProfile) {
+        setAuthError(`Access Denied. Your account is registered as '${userProfile.role}'. Only Admins or Librarians can access this portal.`);
+      } else {
+        // Authenticated but document doesn't exist or has no role
+        setAuthError(`Authenticated as ${user.email}, but no Admin profile was found in the database. Please ensure your UID is registered in the 'users' collection with the 'role' field set to 'Admin'.`);
       }
     }
   }, [user, isUserLoading, userProfile, isProfileLoading, router]);
+
+  const copyToClipboard = () => {
+    if (user?.uid) {
+      navigator.clipboard.writeText(user.uid);
+      setCopied(true);
+      toast({ title: "UID Copied", description: "You can now paste this into the Firebase Console." });
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const handleGoogleLogin = async () => {
     if (!auth || !firestore) return;
@@ -67,7 +80,7 @@ export default function AdminLogin() {
       const loggedUser = result.user;
 
       if (loggedUser.email?.toLowerCase().endsWith('@neu.edu.ph')) {
-        // Sync user profile but don't overwrite role if it already exists
+        // Sync user profile: we merge so we don't overwrite an existing 'role' if they already have one
         const userRef = doc(firestore, 'users', loggedUser.uid);
         await setDoc(userRef, {
           id: loggedUser.uid,
@@ -77,8 +90,8 @@ export default function AdminLogin() {
         }, { merge: true });
 
         toast({
-          title: "Signed in successfully",
-          description: "Checking permissions..."
+          title: "Authorized successfully",
+          description: "Checking database permissions..."
         });
       } else {
         await auth.signOut();
@@ -116,7 +129,7 @@ export default function AdminLogin() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
         <Loader2 className="w-10 h-10 text-primary animate-spin" />
-        <p className="mt-4 text-muted-foreground font-bold tracking-tight">Authenticating...</p>
+        <p className="mt-4 text-muted-foreground font-bold tracking-tight">Authenticating Administrator...</p>
       </div>
     );
   }
@@ -137,38 +150,52 @@ export default function AdminLogin() {
 
           <div className="text-center mb-8">
             <h1 className="text-3xl font-black tracking-tight mb-2">Admin Portal</h1>
-            <p className="text-muted-foreground">Authorized access only.</p>
+            <p className="text-muted-foreground">Authorized Access Only</p>
           </div>
 
           {authError && (
-            <Alert variant="destructive" className="mb-6">
+            <Alert variant="destructive" className="mb-6 bg-destructive/10 border-destructive/20 text-destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Permission Denied</AlertTitle>
-              <AlertDescription className="text-xs break-all">
-                {authError}
+              <AlertTitle className="font-bold">Access Check Failed</AlertTitle>
+              <AlertDescription className="text-xs mt-2 space-y-3">
+                <p>{authError}</p>
+                {user && (
+                  <div className="pt-2 border-t border-destructive/20">
+                    <p className="font-bold mb-1">Your UID (Copy this to Firestore):</p>
+                    <div className="flex items-center gap-2">
+                      <code className="bg-background/50 p-1.5 rounded flex-1 truncate">{user.uid}</code>
+                      <Button size="icon" variant="outline" className="h-8 w-8 shrink-0" onClick={copyToClipboard}>
+                        {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </AlertDescription>
             </Alert>
           )}
 
           <Tabs defaultValue="google" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-8">
-              <TabsTrigger value="google">Google</TabsTrigger>
-              <TabsTrigger value="email">Email</TabsTrigger>
+              <TabsTrigger value="google">Google Login</TabsTrigger>
+              <TabsTrigger value="email">Manual</TabsTrigger>
             </TabsList>
 
             <TabsContent value="google" className="space-y-4">
               <Button 
                 onClick={handleGoogleLogin}
-                className="w-full h-12 font-bold text-lg"
+                className="w-full h-14 font-black text-lg shadow-lg shadow-primary/20"
                 disabled={isGoogleLoading}
               >
                 {isGoogleLoading ? (
                   <Loader2 className="mr-2 w-5 h-5 animate-spin" />
                 ) : (
-                  <Chrome className="mr-2 w-5 h-5" />
+                  <Chrome className="mr-2 w-6 h-6" />
                 )}
-                {isGoogleLoading ? "Connecting..." : "Login with Google"}
+                {isGoogleLoading ? "Connecting..." : "Login with NEU Google"}
               </Button>
+              <p className="text-[10px] text-center text-muted-foreground uppercase tracking-widest font-bold">
+                Use your @neu.edu.ph account
+              </p>
             </TabsContent>
 
             <TabsContent value="email">
@@ -181,7 +208,7 @@ export default function AdminLogin() {
                       id="email" 
                       type="email" 
                       placeholder="name@neu.edu.ph" 
-                      className="pl-10"
+                      className="pl-10 h-12"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -196,7 +223,7 @@ export default function AdminLogin() {
                       id="password" 
                       type="password" 
                       placeholder="••••••••" 
-                      className="pl-10"
+                      className="pl-10 h-12"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
@@ -216,7 +243,7 @@ export default function AdminLogin() {
 
           <div className="mt-8 pt-6 border-t border-muted/20 text-center">
             <p className="text-sm text-muted-foreground italic">
-              Institutional accounts with valid roles only.
+              New Era University Library Management
             </p>
           </div>
         </div>

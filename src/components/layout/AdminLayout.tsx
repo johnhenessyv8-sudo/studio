@@ -36,21 +36,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // Guarded redirect: Redirect if not logged in OR if profile doesn't have allowed role
   useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.replace('/admin/login');
-    } else if (!isUserLoading && user && !isProfileLoading) {
-      // If profile exists but role is not Admin or Librarian, send back to login
-      if (!userProfile || (userProfile.role !== 'Admin' && userProfile.role !== 'Librarian')) {
+    if (!isUserLoading) {
+      if (!user) {
         router.replace('/admin/login');
+      } else if (!isProfileLoading) {
+        // Only redirect if we ARE NOT already on the login page
+        // and we have confirmed they are not an admin
+        const isAdmin = userProfile && (userProfile.role === 'Admin' || userProfile.role === 'Librarian');
+        if (!isAdmin && pathname !== '/admin/login') {
+          router.replace('/admin/login');
+        }
       }
     }
-  }, [user, isUserLoading, userProfile, isProfileLoading, router]);
+  }, [user, isUserLoading, userProfile, isProfileLoading, router, pathname]);
 
   const handleLogout = async () => {
     if (!auth) return;
     try {
       await signOut(auth);
-      router.push('/');
+      router.push('/admin/login');
     } catch (error) {
       console.error("Logout failed:", error);
     }
@@ -62,14 +66,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-12 h-12 text-primary animate-spin" />
-          <p className="text-muted-foreground font-bold tracking-tight">Verifying credentials...</p>
+          <p className="text-muted-foreground font-bold tracking-tight">Verifying Credentials...</p>
         </div>
       </div>
     );
   }
 
-  // If role is not valid, don't show the layout
-  if (!user || !userProfile || (userProfile.role !== 'Admin' && userProfile.role !== 'Librarian')) {
+  // If role is not valid, don't show the layout and let the useEffect handle the redirect
+  const isAdmin = userProfile && (userProfile.role === 'Admin' || userProfile.role === 'Librarian');
+  if (!user || !isAdmin) {
     return null;
   }
 
