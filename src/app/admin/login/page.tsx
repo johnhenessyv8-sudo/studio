@@ -1,5 +1,5 @@
 
-"use client";
+'use client';
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -9,7 +9,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, ShieldCheck, Chrome, Mail, Lock, Loader2 } from 'lucide-react';
 import { useAuth, useUser, useFirestore } from '@/firebase';
-import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
+import { 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signInWithEmailAndPassword,
+  setPersistence,
+  browserLocalPersistence
+} from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
@@ -26,9 +32,10 @@ export default function AdminLogin() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
+  // Use a stable effect to handle redirection after login state is determined
   useEffect(() => {
     if (!isUserLoading && user) {
-      router.push('/admin/dashboard');
+      router.replace('/admin/dashboard');
     }
   }, [user, isUserLoading, router]);
 
@@ -40,11 +47,14 @@ export default function AdminLogin() {
     provider.setCustomParameters({ prompt: 'select_account' });
 
     try {
+      // Explicitly set persistence to local storage
+      await setPersistence(auth, browserLocalPersistence);
+      
       const result = await signInWithPopup(auth, provider);
       const loggedUser = result.user;
 
       // Ensure it's an NEU account
-      if (loggedUser.email?.endsWith('@neu.edu.ph')) {
+      if (loggedUser.email?.toLowerCase().endsWith('@neu.edu.ph')) {
         const userRef = doc(firestore, 'users', loggedUser.uid);
         await setDoc(userRef, {
           id: loggedUser.uid,
@@ -85,6 +95,7 @@ export default function AdminLogin() {
     if (!auth) return;
     setIsSubmitting(true);
     try {
+      await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, email, password);
       toast({
         title: "Signed in",
@@ -100,6 +111,18 @@ export default function AdminLogin() {
       setIsSubmitting(false);
     }
   };
+
+  if (isUserLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+        <p className="mt-4 text-muted-foreground font-medium">Preparing secure access...</p>
+      </div>
+    );
+  }
+
+  // If user is already logged in, show nothing while the redirect effect triggers
+  if (user) return null;
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
@@ -130,7 +153,7 @@ export default function AdminLogin() {
               <Button 
                 onClick={handleGoogleLogin}
                 className="w-full h-12 font-bold text-lg"
-                disabled={isUserLoading || isGoogleLoading}
+                disabled={isGoogleLoading}
               >
                 {isGoogleLoading ? (
                   <Loader2 className="mr-2 w-5 h-5 animate-spin" />
@@ -176,7 +199,7 @@ export default function AdminLogin() {
                 <Button 
                   type="submit" 
                   className="w-full h-12 font-bold text-lg"
-                  disabled={isSubmitting || isUserLoading || isGoogleLoading}
+                  disabled={isSubmitting}
                 >
                   {isSubmitting ? "Logging in..." : "Login"}
                 </Button>
