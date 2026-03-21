@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -31,6 +32,13 @@ export default function AdminLogin() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [currentOrigin, setCurrentOrigin] = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setCurrentOrigin(window.location.origin);
+    }
+  }, []);
 
   // Memoize document reference to avoid unnecessary re-renders
   const userDocRef = useMemoFirebase(() => {
@@ -42,31 +50,29 @@ export default function AdminLogin() {
 
   // Authorization check and redirect logic
   useEffect(() => {
-    // ONLY redirect if we are NOT loading auth AND we have a user AND the profile has finished loading
+    // Only redirect if auth and profile have finished loading
     if (!isUserLoading && user && !isProfileLoading) {
       const role = userProfile?.role;
       const isAdmin = role === 'Admin' || role === 'Librarian';
       
       if (isAdmin) {
+        // We are confirmed as admin, go to dashboard
         router.replace('/admin/dashboard');
+      } else if (userProfile) {
+        // Logged in but not an admin
+        setAuthError(`Access Denied. Your current role is "${role || 'None'}". Your profile must have role: "Admin" in Firestore.`);
       } else {
-        // We have a user but they aren't an admin
-        if (userProfile) {
-          setAuthError(`Access Denied. Your account is active but needs the "Admin" role. Your current role is "${role || 'None'}".`);
-        } else {
-          setAuthError(`Profile Not Found. We found your Google account (${user.email}), but there is no document for your UID in the 'users' collection.`);
-        }
+        // Logged in but no document found
+        setAuthError(`Profile Not Found. We found your account (${user.email}), but there is no document for UID "${user.uid}" in the 'users' collection.`);
       }
     }
   }, [user, isUserLoading, userProfile, isProfileLoading, router]);
 
-  const copyToClipboard = () => {
-    if (user?.uid) {
-      navigator.clipboard.writeText(user.uid);
-      setCopied(true);
-      toast({ title: "UID Copied", description: "Add this ID to your 'users' collection." });
-      setTimeout(() => setCopied(false), 2000);
-    }
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    toast({ title: "Copied", description: "Value copied to clipboard." });
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleGoogleLogin = async () => {
@@ -75,7 +81,6 @@ export default function AdminLogin() {
     setIsGoogleLoading(true);
     setAuthError(null);
     const provider = new GoogleAuthProvider();
-    // Restrict to NEU domain at the Google level
     provider.setCustomParameters({ 
       prompt: 'select_account',
       hd: 'neu.edu.ph' 
@@ -85,12 +90,12 @@ export default function AdminLogin() {
       await signInWithPopup(auth, provider);
       toast({
         title: "Authenticated",
-        description: "Checking Firestore permissions..."
+        description: "Verifying role in Firestore..."
       });
     } catch (error: any) {
       console.error("Auth Error:", error);
       if (error.code === 'auth/invalid-credential') {
-        setAuthError("Auth Failed: 'invalid-credential'. This port (6000) might not be fully synchronized in the Firebase Console yet. Try using Port 9000 or ensure this exact domain is in 'Authorized Domains'.");
+        setAuthError(`Auth Failed: 'invalid-credential'. This usually means the Port 6000 domain is not in your Google Cloud 'Authorized JavaScript origins'.`);
       } else if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
         setAuthError(error.message);
       }
@@ -142,23 +147,38 @@ export default function AdminLogin() {
           </div>
 
           {authError && (
-            <Alert variant="destructive" className="mb-6 bg-destructive/10 border-destructive/20 text-destructive">
+            <Alert variant="destructive" className="mb-6 bg-destructive/10 border-destructive/20 text-destructive overflow-hidden">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle className="font-bold">Access Check Failed</AlertTitle>
               <AlertDescription className="text-xs mt-2 space-y-3">
                 <p>{authError}</p>
+                
+                {authError.includes('invalid-credential') && (
+                  <div className="p-2 bg-background/50 rounded border border-destructive/20">
+                    <p className="font-bold mb-1">Fix steps for Port 6000:</p>
+                    <ol className="list-decimal list-inside space-y-1 opacity-80">
+                      <li>Go to Google Cloud Console.</li>
+                      <li>Add this URL to <strong>Authorized JavaScript origins</strong>:</li>
+                      <li className="font-mono break-all font-bold text-primary">{currentOrigin}</li>
+                      <li>Wait 5 minutes and try again.</li>
+                    </ol>
+                  </div>
+                )}
+
                 {user && (
                   <div className="pt-2 border-t border-destructive/20">
-                    <p className="font-bold mb-1">Your UID:</p>
-                    <div className="flex items-center gap-2">
-                      <code className="bg-background/50 p-1.5 rounded flex-1 truncate font-mono text-[10px]">{user.uid}</code>
-                      <Button size="icon" variant="outline" className="h-8 w-8 shrink-0" onClick={copyToClipboard}>
-                        {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                      </Button>
+                    <p className="font-bold mb-1">Your Account Info:</p>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <code className="bg-background/50 p-1.5 rounded flex-1 truncate font-mono text-[10px]">{user.uid}</code>
+                        <Button size="icon" variant="outline" className="h-8 w-8 shrink-0" onClick={() => copyToClipboard(user.uid)}>
+                          {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                      <p className="opacity-80 leading-relaxed italic">
+                        In Firestore, find document <strong>{user.uid}</strong> and add <strong>role: "Admin"</strong>.
+                      </p>
                     </div>
-                    <p className="mt-3 opacity-80 leading-relaxed italic">
-                      Add <code className="bg-background/50 px-1 rounded">role: "Admin"</code> to this document in Firestore.
-                    </p>
                   </div>
                 )}
               </AlertDescription>
