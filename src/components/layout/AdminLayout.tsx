@@ -1,8 +1,7 @@
-
 'use client';
 
 import React, { useEffect } from 'react';
-import Link from 'link';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, 
