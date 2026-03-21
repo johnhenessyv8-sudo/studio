@@ -47,17 +47,20 @@ export default function AdminLogin() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
   useEffect(() => {
-    // Wait for auth AND profile to finish loading before redirecting
+    // Only attempt auto-redirect if loading is fully complete
     if (!isUserLoading && user && !isProfileLoading) {
       const role = userProfile?.role;
       const isAdmin = role === 'Admin' || role === 'Librarian';
       
       if (isAdmin) {
+        // Redirect only if authorized
         router.replace('/admin/dashboard');
       } else if (userProfile) {
-        setAuthError(`Access Denied. Your role in Firestore is "${role || 'None'}". Authorized roles: "Admin", "Librarian".`);
+        // Explicitly set error if profile exists but role is wrong
+        setAuthError(`Access Denied. Your profile exists, but your role is "${role || 'None'}". Authorized roles: "Admin", "Librarian".`);
       } else {
-        setAuthError(`Profile Not Found. We found your Google account, but no document for UID "${user.uid}" exists in the 'users' collection.`);
+        // Explicitly set error if profile is missing
+        setAuthError(`Profile Not Found. No Firestore document found for UID "${user.uid}" in the 'users' collection.`);
       }
     }
   }, [user, isUserLoading, userProfile, isProfileLoading, router]);
@@ -76,8 +79,7 @@ export default function AdminLogin() {
     setAuthError(null);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ 
-      prompt: 'select_account',
-      hd: 'neu.edu.ph' 
+      prompt: 'select_account'
     });
 
     try {
@@ -85,10 +87,11 @@ export default function AdminLogin() {
     } catch (error: any) {
       console.error("Auth Error:", error);
       if (error.code === 'auth/invalid-credential') {
-        setAuthError(`Auth Failed: 'invalid-credential'. Please ensure your domain is authorized in Firebase Console.`);
+        setAuthError(`Auth Failed: 'invalid-credential'. This domain might not be authorized yet.`);
       } else if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
         setAuthError(error.message);
       }
+    } finally {
       setIsGoogleLoading(false);
     }
   };
@@ -106,12 +109,13 @@ export default function AdminLogin() {
     }
   };
 
+  // Critical Loading State: Wait for both auth and profile to resolve if user exists
   if (isUserLoading || (user && isProfileLoading)) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
         <h2 className="text-xl font-bold font-headline">Checking Authorization</h2>
-        <p className="text-muted-foreground mt-2 italic">Verifying role in Firestore...</p>
+        <p className="text-muted-foreground mt-2 italic">Verifying your role in Firestore...</p>
       </div>
     );
   }
@@ -146,7 +150,7 @@ export default function AdminLogin() {
               {currentOrigin || 'Detecting...'}
             </code>
             <p className="text-[9px] text-muted-foreground leading-relaxed italic">
-              Ensure this domain is added to <strong>Authorized Domains</strong> in your Firebase Console (Authentication &gt; Settings).
+              Add the hostname above to <strong>Authorized Domains</strong> in Firebase Console. (Remove https:// and trailing slashes).
             </p>
           </div>
 
@@ -166,7 +170,7 @@ export default function AdminLogin() {
                         {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                       </Button>
                     </div>
-                    <p className="mt-2 opacity-70 italic">Verify your document in Firestore has <strong>role: "Admin"</strong>.</p>
+                    <p className="mt-2 opacity-70 italic">Verify document in Firestore exists with <strong>role: "Admin"</strong>.</p>
                   </div>
                 )}
               </AlertDescription>
@@ -192,42 +196,33 @@ export default function AdminLogin() {
                 )}
                 {isGoogleLoading ? "Connecting..." : "Login with NEU Google"}
               </Button>
-              <p className="text-[10px] text-center text-muted-foreground uppercase tracking-widest font-bold">
-                Use your @neu.edu.ph account
-              </p>
             </TabsContent>
 
             <TabsContent value="email">
               <form onSubmit={handleEmailLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Work Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input 
-                      id="email" 
-                      type="email" 
-                      placeholder="name@neu.edu.ph" 
-                      className="pl-10 h-12 bg-secondary/30"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    placeholder="name@neu.edu.ph" 
+                    className="h-12 bg-secondary/30"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input 
-                      id="password" 
-                      type="password" 
-                      placeholder="••••••••" 
-                      className="pl-10 h-12 bg-secondary/30"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
+                  <Input 
+                    id="password" 
+                    type="password" 
+                    placeholder="••••••••" 
+                    className="h-12 bg-secondary/30"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
                 </div>
                 <Button 
                   type="submit" 

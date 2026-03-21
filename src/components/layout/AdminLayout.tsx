@@ -34,21 +34,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
-  // Critical loading synchronization
-  const isAuthorizing = isUserLoading || (!!user && isProfileLoading);
+  // Critical Loading Check: Wait for EVERYTHING before deciding to redirect
+  const isSyncing = isUserLoading || (!!user && isProfileLoading);
   
   const role = userProfile?.role;
   const isAdmin = role === 'Admin' || role === 'Librarian';
 
   useEffect(() => {
-    // Only make routing decisions once all loading states are settled
-    if (!isAuthorizing) {
+    // Only make a decision once loading has completely stopped
+    if (!isSyncing) {
       if (!user || !isAdmin) {
-        // Use replace to avoid polluting history and causing "back" issues
+        // Redirect back to login if not authorized
         router.replace('/admin/login');
       }
     }
-  }, [user, isAuthorizing, isAdmin, router]);
+  }, [user, isSyncing, isAdmin, router]);
 
   const handleLogout = async () => {
     if (!auth) return;
@@ -60,7 +60,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   };
 
-  if (isAuthorizing) {
+  if (isSyncing) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
@@ -70,7 +70,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  // Final safety check to ensure we don't flash content
+  // Final safety check to ensure we don't flash content if unauthorized
   if (!user || !isAdmin) {
     return null;
   }
