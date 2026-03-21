@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, ShieldCheck, Chrome, Mail, Lock, Loader2, AlertCircle, Copy, Check } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Chrome, Mail, Lock, Loader2, AlertCircle, Copy, Check, Globe } from 'lucide-react';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { 
   GoogleAuthProvider, 
@@ -56,9 +56,9 @@ export default function AdminLogin() {
       if (isAdmin) {
         router.replace('/admin/dashboard');
       } else if (userProfile) {
-        setAuthError(`Access Denied. Your current role is "${role || 'None'}". Your profile in Firestore MUST have role: "Admin".`);
+        setAuthError(`Access Denied. Your role in Firestore is "${role || 'None'}". Authorized roles: "Admin", "Librarian".`);
       } else {
-        setAuthError(`Profile Not Found. No document for UID "${user.uid}" in 'users' collection.`);
+        setAuthError(`Profile Not Found. We found your Google account, but no document for UID "${user.uid}" exists in the 'users' collection.`);
       }
     }
   }, [user, isUserLoading, userProfile, isProfileLoading, router]);
@@ -86,7 +86,7 @@ export default function AdminLogin() {
     } catch (error: any) {
       console.error("Auth Error:", error);
       if (error.code === 'auth/invalid-credential') {
-        setAuthError(`Auth Failed: 'invalid-credential'. This is common for Port 6000. Add this origin to Google Cloud Origins.`);
+        setAuthError(`Auth Failed: 'invalid-credential'. Please ensure your domain is authorized in Firebase Console.`);
       } else if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
         setAuthError(error.message);
       }
@@ -136,6 +136,21 @@ export default function AdminLogin() {
             <p className="text-muted-foreground italic">New Era University Library</p>
           </div>
 
+          {/* Diagnostic Info Box */}
+          <div className="mb-6 p-4 bg-secondary/50 rounded-2xl border border-primary/10 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                <Globe className="w-3 h-3" /> Current Domain
+              </span>
+            </div>
+            <code className="block bg-background/50 p-2 rounded font-mono text-[10px] break-all leading-relaxed">
+              {currentOrigin || 'Detecting...'}
+            </code>
+            <p className="text-[9px] text-muted-foreground leading-relaxed italic">
+              Ensure this domain is added to <strong>Authorized Domains</strong> in your Firebase Console (Authentication > Settings).
+            </p>
+          </div>
+
           {authError && (
             <Alert variant="destructive" className="mb-6 bg-destructive/10 border-destructive/20 text-destructive overflow-hidden">
               <AlertCircle className="h-4 w-4" />
@@ -143,12 +158,6 @@ export default function AdminLogin() {
               <AlertDescription className="text-xs mt-2 space-y-3">
                 <p>{authError}</p>
                 
-                <div className="p-2 bg-background/50 rounded border border-destructive/20">
-                  <p className="font-bold mb-1">Your Current Origin:</p>
-                  <code className="bg-background/50 p-1 rounded font-mono text-[10px] break-all">{currentOrigin}</code>
-                  <p className="mt-2 opacity-70 italic">Add this to "Authorized JavaScript origins" in Google Cloud Console.</p>
-                </div>
-
                 {user && (
                   <div className="pt-2 border-t border-destructive/20">
                     <p className="font-bold mb-1">Your Account UID:</p>
@@ -158,7 +167,7 @@ export default function AdminLogin() {
                         {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                       </Button>
                     </div>
-                    <p className="mt-2 opacity-70 italic">Check doc <strong>{user.uid}</strong> in Firestore for <strong>role: "Admin"</strong>.</p>
+                    <p className="mt-2 opacity-70 italic">Verify your document in Firestore has <strong>role: "Admin"</strong>.</p>
                   </div>
                 )}
               </AlertDescription>

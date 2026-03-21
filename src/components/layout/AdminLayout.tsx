@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import Link from 'next/link';
+import Link from 'link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, 
@@ -35,17 +35,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
-  // Determine if we are still waiting for authentication OR the profile data
-  // We explicitly check !!user to see if we should be expecting profile data
+  // Critical loading synchronization
   const isAuthorizing = isUserLoading || (!!user && isProfileLoading);
   
   const role = userProfile?.role;
   const isAdmin = role === 'Admin' || role === 'Librarian';
 
   useEffect(() => {
-    // Only act once all loading states are settled
+    // Only make routing decisions once all loading states are settled
     if (!isAuthorizing) {
       if (!user || !isAdmin) {
+        // Use replace to avoid polluting history and causing "back" issues
         router.replace('/admin/login');
       }
     }
@@ -65,13 +65,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-        <h2 className="text-xl font-bold font-headline">Verifying Permissions</h2>
+        <h2 className="text-xl font-bold font-headline">Authorizing Access</h2>
         <p className="text-muted-foreground mt-2 italic">Syncing Firestore Profile...</p>
       </div>
     );
   }
 
-  // Safety guard: if not authorized, don't show children
+  // Final safety check to ensure we don't flash content
   if (!user || !isAdmin) {
     return null;
   }
