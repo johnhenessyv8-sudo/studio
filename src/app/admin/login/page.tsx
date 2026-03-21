@@ -11,7 +11,7 @@ import { useAuth, useUser, useFirestore } from '@/firebase';
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription, AlertTitle } from '@/components/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function AdminLogin() {
   const auth = useAuth();
@@ -39,13 +39,11 @@ export default function AdminLogin() {
       
       setIsVerifying(true);
       try {
-        // Attempt 1: Fetch by UID directly
         const userDocRef = doc(firestore, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
         
         let profile = userSnap.exists() ? userSnap.data() : null;
 
-        // Attempt 2: Fallback to email search (Crucial for linking newly added admins/librarians)
         if (!profile && user.email) {
           const q = query(
             collection(firestore, 'users'), 
@@ -55,7 +53,6 @@ export default function AdminLogin() {
           if (!querySnap.empty) {
             const foundDoc = querySnap.docs[0];
             profile = foundDoc.data();
-            // Automatically link UID to this pre-registered record
             await updateDoc(foundDoc.ref, {
               id: user.uid,
               updatedAt: serverTimestamp()
