@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useAuth } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
+import { Badge } from '@/components/ui/badge';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -38,13 +39,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isAdmin = role === 'Admin' || role === 'Librarian';
 
   useEffect(() => {
-    // Only redirect once loading is fully finished for both Auth and Firestore
+    // Only attempt redirection once we are ABSOLUTELY sure about the load state
     if (!isUserLoading && !isProfileLoading) {
-      if (!user) {
-        // Definitely not logged in
-        router.replace('/admin/login');
-      } else if (!isAdmin) {
-        // Logged in but not an admin
+      if (!user || !isAdmin) {
+        // Not logged in or not authorized -> send back to login
         router.replace('/admin/login');
       }
     }
@@ -60,7 +58,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   };
 
-  // Show a full-page loader while checking auth OR profile
+  // While we are checking auth or loading the profile, show a full-page loader
   if (isUserLoading || (user && isProfileLoading)) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
@@ -71,7 +69,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  // Safety check
+  // Final safety check: if we aren't authorized, don't render the dashboard at all
   if (!user || !isAdmin) {
     return null;
   }

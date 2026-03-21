@@ -13,7 +13,7 @@ import {
   signInWithPopup, 
   signInWithEmailAndPassword
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -32,6 +32,7 @@ export default function AdminLogin() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Memoize document reference to avoid unnecessary re-renders
   const userDocRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return doc(firestore, 'users', user.uid);
@@ -41,16 +42,20 @@ export default function AdminLogin() {
 
   // Authorization check and redirect logic
   useEffect(() => {
+    // ONLY redirect if we are NOT loading auth AND we have a user AND the profile has finished loading
     if (!isUserLoading && user && !isProfileLoading) {
       const role = userProfile?.role;
       const isAdmin = role === 'Admin' || role === 'Librarian';
       
       if (isAdmin) {
         router.replace('/admin/dashboard');
-      } else if (userProfile) {
-        setAuthError(`Access Denied. Your account is active but needs the "Admin" role. Current role: "${role || 'None'}".`);
       } else {
-        setAuthError(`Access Denied. No profile found for UID: ${user.uid}. Please ensure your email is @neu.edu.ph and you are added to the users collection.`);
+        // We have a user but they aren't an admin
+        if (userProfile) {
+          setAuthError(`Access Denied. Your account is active but needs the "Admin" role. Your current role is "${role || 'None'}".`);
+        } else {
+          setAuthError(`Profile Not Found. We found your Google account (${user.email}), but there is no document for your UID in the 'users' collection.`);
+        }
       }
     }
   }, [user, isUserLoading, userProfile, isProfileLoading, router]);
@@ -70,20 +75,22 @@ export default function AdminLogin() {
     setIsGoogleLoading(true);
     setAuthError(null);
     const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
+    // Restrict to NEU domain at the Google level
+    provider.setCustomParameters({ 
+      prompt: 'select_account',
+      hd: 'neu.edu.ph' 
+    });
 
     try {
-      // Note: We don't necessarily need to await the result if the popup gets stuck.
-      // The useUser() hook/FirebaseProvider will detect the auth state change globally.
       await signInWithPopup(auth, provider);
-      
       toast({
         title: "Authenticated",
-        description: "Checking permissions..."
+        description: "Checking Firestore permissions..."
       });
     } catch (error: any) {
+      console.error("Auth Error:", error);
       if (error.code === 'auth/invalid-credential') {
-        setAuthError("Google Sign-In failed (Invalid Credential). This often happens if the current domain is not added to 'Authorized Domains' in your Firebase Console.");
+        setAuthError("Auth Failed: 'invalid-credential'. This port (6000) might not be fully synchronized in the Firebase Console yet. Try using Port 9000 or ensure this exact domain is in 'Authorized Domains'.");
       } else if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
         setAuthError(error.message);
       }
@@ -104,7 +111,7 @@ export default function AdminLogin() {
     }
   };
 
-  // If we are definitely loading or have a user but are waiting for their profile
+  // While waiting for initial check, show a stable loader
   if (isUserLoading || (user && isProfileLoading)) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
@@ -140,12 +147,6 @@ export default function AdminLogin() {
               <AlertTitle className="font-bold">Access Check Failed</AlertTitle>
               <AlertDescription className="text-xs mt-2 space-y-3">
                 <p>{authError}</p>
-                {authError.includes('Authorized Domains') && (
-                  <div className="bg-background/40 p-3 rounded-lg flex gap-2 items-start mt-2">
-                    <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                    <p>Go to <strong>Authentication &gt; Settings</strong> in Firebase Console to add this port/domain.</p>
-                  </div>
-                )}
                 {user && (
                   <div className="pt-2 border-t border-destructive/20">
                     <p className="font-bold mb-1">Your UID:</p>
@@ -156,7 +157,7 @@ export default function AdminLogin() {
                       </Button>
                     </div>
                     <p className="mt-3 opacity-80 leading-relaxed italic">
-                      Add <code className="bg-background/50 px-1 rounded">role: "Admin"</code> to this ID in the users collection.
+                      Add <code className="bg-background/50 px-1 rounded">role: "Admin"</code> to this document in Firestore.
                     </p>
                   </div>
                 )}
@@ -184,7 +185,7 @@ export default function AdminLogin() {
                 {isGoogleLoading ? "Connecting..." : "Login with NEU Google"}
               </Button>
               <p className="text-[10px] text-center text-muted-foreground uppercase tracking-widest font-bold">
-                Use your @neu.edu.ph institutional account
+                Use your @neu.edu.ph account
               </p>
             </TabsContent>
 
