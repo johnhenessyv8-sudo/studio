@@ -42,20 +42,18 @@ export default function AdminLogin() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
   useEffect(() => {
-    // Only proceed once we are absolutely sure the profile data is definitively loaded
+    // Only redirect to dashboard if auth is complete, profile is loaded, AND user is admin
     if (!isUserLoading && user && !isProfileLoading) {
       const role = userProfile?.role;
       const isAdmin = role === 'Admin' || role === 'Librarian';
       
       if (isAdmin) {
-        // Redirect to dashboard if they are already authorized
         router.replace('/admin/dashboard');
       } else if (userProfile) {
-        // Profile exists but role is missing or incorrect
-        setAuthError(`Access Denied. Your role is currently "${role || 'None'}". Admins only.`);
+        setAuthError(`Access Denied. Your account is active but has no Admin role. Current role: "${role || 'None'}".`);
       } else {
-        // Profile doesn't exist yet
-        setAuthError(`Access Denied. Your profile (UID: ${user.uid}) was not found or is still syncing. Please add role: "Admin" to your Firestore document.`);
+        // Profile might be missing or still syncing
+        setAuthError(`Access Denied. No profile found for UID: ${user.uid}. Please add 'role: "Admin"' to your document.`);
       }
     }
   }, [user, isUserLoading, userProfile, isProfileLoading, router]);
@@ -64,7 +62,7 @@ export default function AdminLogin() {
     if (user?.uid) {
       navigator.clipboard.writeText(user.uid);
       setCopied(true);
-      toast({ title: "UID Copied", description: "Add this ID to your 'users' collection in Firestore." });
+      toast({ title: "UID Copied", description: "Add this ID to your 'users' collection." });
       setTimeout(() => setCopied(false), 2000);
     }
   };
@@ -79,12 +77,13 @@ export default function AdminLogin() {
 
     try {
       await setPersistence(auth, browserLocalPersistence);
+      // Popup might get stuck in some environments, but useUser() will pick up the state change
       const result = await signInWithPopup(auth, provider);
       const loggedUser = result.user;
 
       if (loggedUser.email?.toLowerCase().endsWith('@neu.edu.ph')) {
         const userRef = doc(firestore, 'users', loggedUser.uid);
-        // Sync basic info, but DON'T overwrite existing role if it exists
+        // Sync basic info, but DON'T overwrite existing role
         await setDoc(userRef, {
           id: loggedUser.uid,
           fullName: loggedUser.displayName,
@@ -94,15 +93,16 @@ export default function AdminLogin() {
         }, { merge: true });
 
         toast({
-          title: "Sign-in successful",
-          description: "Verifying administrative permissions..."
+          title: "Authenticated",
+          description: "Syncing your administrative profile..."
         });
       } else {
         await auth.signOut();
         setAuthError("Only @neu.edu.ph institutional accounts are allowed.");
       }
     } catch (error: any) {
-      if (error.code !== 'auth/popup-closed-by-user') {
+      if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
+        console.error("Auth error:", error);
         setAuthError(error.message);
       }
     } finally {
@@ -125,11 +125,13 @@ export default function AdminLogin() {
     }
   };
 
+  // If user is logged in and we are waiting for profile, show a loading state
   if (isUserLoading || (user && isProfileLoading)) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
-        <Loader2 className="w-10 h-10 text-primary animate-spin" />
-        <p className="mt-4 text-muted-foreground font-bold tracking-tight">Checking Permissions...</p>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
+        <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
+        <h2 className="text-xl font-bold">Verifying NEU Credentials</h2>
+        <p className="text-muted-foreground mt-2">Checking your administrative permissions...</p>
       </div>
     );
   }
@@ -150,24 +152,27 @@ export default function AdminLogin() {
 
           <div className="text-center mb-8">
             <h1 className="text-3xl font-black tracking-tight mb-2">Admin Portal</h1>
-            <p className="text-muted-foreground">Authorized Access Only</p>
+            <p className="text-muted-foreground italic">New Era University Library</p>
           </div>
 
           {authError && (
             <Alert variant="destructive" className="mb-6 bg-destructive/10 border-destructive/20 text-destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle className="font-bold">Access Denied</AlertTitle>
+              <AlertTitle className="font-bold">Access Check Failed</AlertTitle>
               <AlertDescription className="text-xs mt-2 space-y-3">
                 <p>{authError}</p>
                 {user && (
                   <div className="pt-2 border-t border-destructive/20">
-                    <p className="font-bold mb-1">Your UID (Document ID):</p>
+                    <p className="font-bold mb-1">Your Document ID (UID):</p>
                     <div className="flex items-center gap-2">
-                      <code className="bg-background/50 p-1.5 rounded flex-1 truncate">{user.uid}</code>
+                      <code className="bg-background/50 p-1.5 rounded flex-1 truncate font-mono">{user.uid}</code>
                       <Button size="icon" variant="outline" className="h-8 w-8 shrink-0" onClick={copyToClipboard}>
                         {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                       </Button>
                     </div>
+                    <p className="mt-3 opacity-80 leading-relaxed">
+                      Please ensure your document in the <strong className="underline">users</strong> collection has a field: <code className="bg-background/50 px-1 rounded">role: "Admin"</code>.
+                    </p>
                   </div>
                 )}
               </AlertDescription>
@@ -243,7 +248,7 @@ export default function AdminLogin() {
 
           <div className="mt-8 pt-6 border-t border-muted/20 text-center">
             <p className="text-sm text-muted-foreground italic">
-              New Era University Library Management
+              Authorized Personnel Only
             </p>
           </div>
         </div>

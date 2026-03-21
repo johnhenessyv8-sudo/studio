@@ -38,14 +38,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isAdmin = role === 'Admin' || role === 'Librarian';
 
   useEffect(() => {
-    // Wait for everything to be ready before deciding to redirect
+    // CRITICAL: Only redirect if loading is finished.
+    // We stay on the loading screen until we are 100% sure about the auth and profile status.
     if (!isUserLoading) {
       if (!user) {
-        // Definitely not logged in
+        // Definitely not logged in at all
         router.replace('/admin/login');
       } else if (!isProfileLoading) {
-        // Definitely loaded, check if authorized
+        // Auth is confirmed, Profile loading is finished. 
+        // Now check if they are actually authorized.
         if (!isAdmin) {
+          // Logged in user has no admin role
           router.replace('/admin/login');
         }
       }
@@ -62,19 +65,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   };
 
-  // Show a clean loader while determining auth/admin state
-  if (isUserLoading || (user && isProfileLoading) || (user && !isProfileLoading && !isAdmin)) {
+  // Show a full-page loader while checking auth OR profile
+  // This prevents the flickering loop by keeping the user on a neutral "waiting" state
+  if (isUserLoading || (user && isProfileLoading)) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-12 h-12 text-primary animate-spin" />
-          <p className="text-muted-foreground font-bold tracking-tight">Verifying Credentials...</p>
-        </div>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
+        <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
+        <h2 className="text-xl font-bold">Verifying Permissions</h2>
+        <p className="text-muted-foreground mt-2">Connecting to NEU Library Secure Portal...</p>
       </div>
     );
   }
 
-  // Prevent UI flashing if not authorized
+  // Final safety check: if we aren't loading but also aren't authorized, don't show the dashboard
   if (!user || !isAdmin) {
     return null;
   }
