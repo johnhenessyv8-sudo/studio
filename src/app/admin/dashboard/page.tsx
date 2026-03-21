@@ -116,7 +116,8 @@ export default function Dashboard() {
     
     const headers = ["Visitor Email", "College", "Purpose", "Entry Time"];
     const rows = visits.map(v => {
-      const userProfile = users?.find(u => u.institutionalEmail?.toLowerCase() === v.visitorEmail?.toLowerCase());
+      const visitorEmail = v.visitorEmail?.toLowerCase().trim();
+      const userProfile = users?.find(u => u.institutionalEmail?.toLowerCase().trim() === visitorEmail);
       return [
         v.visitorEmail,
         userProfile?.college || "N/A",

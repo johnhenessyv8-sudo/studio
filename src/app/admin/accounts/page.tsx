@@ -17,7 +17,8 @@ import {
   MoreVertical,
   Edit2,
   FileDown,
-  Key
+  Key,
+  AlertCircle
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,7 @@ import { useToast } from '@/hooks/use-toast';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'firebase/auth';
 import { firebaseConfig } from '@/firebase/config';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function AccountManagement() {
   const { user } = useUser();
@@ -83,7 +85,8 @@ export default function AccountManagement() {
     e.preventDefault();
     if (!firestore || isSaving) return;
 
-    if (!formData.email.endsWith('@neu.edu.ph')) {
+    const emailLower = formData.email.toLowerCase().trim();
+    if (!emailLower.endsWith('@neu.edu.ph')) {
       toast({
         variant: "destructive",
         title: "Invalid Email",
@@ -99,17 +102,17 @@ export default function AccountManagement() {
       const secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
       const secondaryAuth = getAuth(secondaryApp);
       
-      const authUser = await createUserWithEmailAndPassword(secondaryAuth, formData.email.toLowerCase(), "mypassword123");
+      const authUser = await createUserWithEmailAndPassword(secondaryAuth, emailLower, "mypassword123");
       const uid = authUser.user.uid;
 
       await signOut(secondaryAuth);
       await deleteApp(secondaryApp);
 
       const userRef = doc(firestore, 'users', uid);
-      const data = {
+      const userData = {
         id: uid,
         fullName: formData.fullName,
-        institutionalEmail: formData.email.toLowerCase(),
+        institutionalEmail: emailLower,
         idNumber: formData.idNumber,
         college: formData.college,
         role: formData.role,
@@ -118,23 +121,14 @@ export default function AccountManagement() {
         updatedAt: serverTimestamp()
       };
 
-      setDoc(userRef, data)
-        .then(() => {
-          toast({
-            title: "User Created",
-            description: `${formData.fullName} added successfully.`
-          });
-          setIsAddOpen(false);
-          setFormData({ fullName: '', email: '', idNumber: '', college: '', role: 'Student' });
-        })
-        .catch(async () => {
-          const permissionError = new FirestorePermissionError({
-            path: userRef.path,
-            operation: 'create',
-            requestResourceData: data,
-          });
-          errorEmitter.emit('permission-error', permissionError);
-        });
+      await setDoc(userRef, userData);
+      
+      toast({
+        title: "User Created",
+        description: `${formData.fullName} added successfully.`
+      });
+      setIsAddOpen(false);
+      setFormData({ fullName: '', email: '', idNumber: '', college: '', role: 'Student' });
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -146,39 +140,38 @@ export default function AccountManagement() {
     }
   };
 
-  const handleUpdateUser = (e: React.FormEvent) => {
+  const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firestore || !editingUser || isSaving) return;
 
     setIsSaving(true);
-    const userRef = doc(firestore, 'users', editingUser.id);
-    const updatedData = {
-      fullName: editingUser.fullName,
-      idNumber: editingUser.idNumber,
-      college: editingUser.college,
-      role: editingUser.role,
-      updatedAt: serverTimestamp()
-    };
+    try {
+      const userRef = doc(firestore, 'users', editingUser.id);
+      const updatedData = {
+        fullName: editingUser.fullName,
+        idNumber: editingUser.idNumber,
+        college: editingUser.college,
+        role: editingUser.role,
+        updatedAt: serverTimestamp()
+      };
 
-    updateDoc(userRef, updatedData)
-      .then(() => {
-        toast({
-          title: "Profile Updated",
-          description: "User details have been saved successfully."
-        });
-      })
-      .catch(async () => {
-        const permissionError = new FirestorePermissionError({
-          path: userRef.path,
-          operation: 'update',
-          requestResourceData: updatedData,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      })
-      .finally(() => {
-        setIsSaving(false);
-        setIsEditOpen(false);
+      await updateDoc(userRef, updatedData);
+      
+      toast({
+        title: "Profile Updated",
+        description: "User details have been saved successfully."
       });
+      setIsEditOpen(false);
+    } catch (error: any) {
+      const permissionError = new FirestorePermissionError({
+        path: `users/${editingUser.id}`,
+        operation: 'update',
+        requestResourceData: editingUser,
+      });
+      errorEmitter.emit('permission-error', permissionError);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleResetPassword = async (email: string) => {
@@ -214,18 +207,24 @@ export default function AccountManagement() {
       });
   };
 
-  const handleDeleteUser = (userItem: any) => {
-    if (!firestore || !window.confirm(`Are you sure you want to permanently delete ${userItem.fullName}?`)) return;
-    const userRef = doc(firestore, 'users', userItem.id);
+  const handleDeleteUser = async (userItem: any) => {
+    if (!firestore) return;
+    if (!window.confirm(`Are you sure you want to permanently delete ${userItem.fullName}? This action cannot be undone.`)) return;
     
-    deleteDoc(userRef)
-      .catch(async () => {
-        const permissionError = new FirestorePermissionError({
-          path: userRef.path,
-          operation: 'delete',
-        });
-        errorEmitter.emit('permission-error', permissionError);
+    try {
+      const userRef = doc(firestore, 'users', userItem.id);
+      await deleteDoc(userRef);
+      toast({
+        title: "User Deleted",
+        description: `${userItem.fullName} has been removed from the database.`
       });
+    } catch (error: any) {
+      const permissionError = new FirestorePermissionError({
+        path: `users/${userItem.id}`,
+        operation: 'delete',
+      });
+      errorEmitter.emit('permission-error', permissionError);
+    }
   };
 
   const exportToCSV = () => {
@@ -233,7 +232,7 @@ export default function AccountManagement() {
     
     const headers = ["Full Name", "Email", "ID Number", "College", "Role", "Status"];
     const rows = filteredUsers.map(u => [
-      u.fullName,
+      `"${u.fullName}"`,
       u.institutionalEmail,
       u.idNumber || u.id,
       u.college || "N/A",
@@ -552,6 +551,7 @@ export default function AccountManagement() {
                   value={editingUser?.fullName || ''}
                   onChange={(e) => setEditingUser({...editingUser, fullName: e.target.value})}
                   required
+                  disabled={isSaving}
                 />
               </div>
               <div className="space-y-2">
@@ -561,6 +561,7 @@ export default function AccountManagement() {
                   value={editingUser?.idNumber || ''}
                   onChange={(e) => setEditingUser({...editingUser, idNumber: e.target.value})}
                   required
+                  disabled={isSaving}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -569,6 +570,7 @@ export default function AccountManagement() {
                   <Select 
                     value={editingUser?.college || ''} 
                     onValueChange={(val) => setEditingUser({...editingUser, college: val})}
+                    disabled={isSaving}
                   >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -585,6 +587,7 @@ export default function AccountManagement() {
                   <Select 
                     value={editingUser?.role || ''} 
                     onValueChange={(val) => setEditingUser({...editingUser, role: val})}
+                    disabled={isSaving}
                   >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
