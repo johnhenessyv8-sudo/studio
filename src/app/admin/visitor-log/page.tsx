@@ -64,7 +64,7 @@ export default function VisitorLogPage() {
     if (!isDeleteOpen) {
       const timeoutId = setTimeout(() => {
         document.body.style.pointerEvents = 'auto';
-      }, 100);
+      }, 150);
       return () => clearTimeout(timeoutId);
     }
   }, [isDeleteOpen]);
@@ -370,6 +370,6 @@ export default function VisitorLogPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AdminLayout>
   );
 }

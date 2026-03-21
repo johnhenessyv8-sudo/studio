@@ -94,7 +94,7 @@ export default function AccountManagement() {
     if (!isAddOpen && !isEditOpen && !isDeleteOpen) {
       const timeoutId = setTimeout(() => {
         document.body.style.pointerEvents = 'auto';
-      }, 100);
+      }, 150);
       return () => clearTimeout(timeoutId);
     }
   }, [isAddOpen, isEditOpen, isDeleteOpen]);
