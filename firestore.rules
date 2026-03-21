@@ -9,40 +9,24 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-
-    function isAdmin() {
-      return isSignedIn() && getUserData().role == 'Admin';
-    }
-
-    function isLibrarian() {
-      return isSignedIn() && (getUserData().role == 'Librarian' || getUserData().role == 'Admin');
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
     // --- Collection Rules ---
 
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin() || isLibrarian();
-      allow list: if isAdmin() || isLibrarian();
-      
-      // Allow creation if the user is signing up with an NEU email.
-      // Admins can create/update any user.
-      allow create: if (isSignedIn() && request.resource.data.institutionalEmail.matches('.*@neu.edu.ph')) || isAdmin();
-      allow update: if (isOwner(userId) && request.resource.data.institutionalEmail.matches('.*@neu.edu.ph')) || isAdmin();
-      allow delete: if isAdmin();
+      // Any signed-in user can read and update their own profile.
+      // Any signed-in user can read the list (for now, based on your request).
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if false; 
     }
 
     match /visits/{visitId} {
-      // Admins and librarians can read all logs.
-      allow get, list: if isAdmin() || isLibrarian();
-      // Allow creation if the visitor states a valid NEU email.
+      // Any authenticated user can read the logs.
+      allow read: if isSignedIn();
+      
+      // Public creation still allowed for visitors logging via email.
       allow create: if request.resource.data.visitorEmail.matches('.*@neu.edu.ph');
+      
       allow update, delete: if false; 
     }
   }
