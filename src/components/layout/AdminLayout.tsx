@@ -34,25 +34,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
+  // Authorization check
+  const role = userProfile?.role;
+  const isAdmin = role === 'Admin' || role === 'Librarian';
+
   useEffect(() => {
-    // Only redirect once we are sure about the loading state
+    // Only handle redirects once we are definitely finished loading auth and profile
     if (!isUserLoading) {
       if (!user) {
-        // Not logged in at all
-        if (pathname !== '/admin/login') {
-          router.replace('/admin/login');
-        }
+        // Not logged in -> Go to login
+        router.replace('/admin/login');
       } else if (!isProfileLoading) {
-        // Logged in, profile loaded. Check role.
-        const isAdmin = userProfile && (userProfile.role === 'Admin' || userProfile.role === 'Librarian');
-        
-        if (!isAdmin && pathname !== '/admin/login') {
-          // Logged in but not authorized
+        // Logged in but not an authorized role -> Go to login (which will show error)
+        if (!isAdmin) {
           router.replace('/admin/login');
         }
       }
     }
-  }, [user, isUserLoading, userProfile, isProfileLoading, router, pathname]);
+  }, [user, isUserLoading, isProfileLoading, isAdmin, router]);
 
   const handleLogout = async () => {
     if (!auth) return;
@@ -64,7 +63,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   };
 
-  if (isUserLoading || (user && isProfileLoading)) {
+  // While loading OR while about to redirect, show a clean loader
+  if (isUserLoading || (user && isProfileLoading) || (user && !isProfileLoading && !isAdmin)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -75,12 +75,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  // Final access check
-  const isAdmin = userProfile && (userProfile.role === 'Admin' || userProfile.role === 'Librarian');
-  
+  // Final check before rendering children
   if (!user || !isAdmin) {
-    // If not admin, the useEffect above handles the redirect
-    // We render nothing to prevent UI flashing
     return null;
   }
 
@@ -135,7 +131,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="px-4">
             <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-1">Signed in as</p>
             <p className="text-sm font-bold truncate text-primary">{userProfile?.fullName || user.displayName || user.email}</p>
-            <p className="text-[10px] text-muted-foreground uppercase font-black">{userProfile?.role || 'Visitor'}</p>
+            <p className="text-[10px] text-muted-foreground uppercase font-black">{role || 'Authorized'}</p>
           </div>
           <Button 
             variant="ghost" 

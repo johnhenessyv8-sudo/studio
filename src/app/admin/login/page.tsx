@@ -43,21 +43,21 @@ export default function AdminLogin() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
   useEffect(() => {
+    // Wait for all auth and profile data to be ready before deciding to redirect
     if (!isUserLoading && user && !isProfileLoading) {
-      const isAdmin = userProfile && (userProfile.role === 'Admin' || userProfile.role === 'Librarian');
+      const role = userProfile?.role;
+      const isAdmin = role === 'Admin' || role === 'Librarian';
       
       if (isAdmin) {
+        // Use replace to prevent back-button loops
         router.replace('/admin/dashboard');
-      } else if (userProfile) {
-        // User exists but has no role or wrong role
-        const roleMsg = userProfile.role 
-          ? `Access Denied. Your current role is "${userProfile.role}".` 
-          : `Access Denied. Your account has no "role" assigned in Firestore.`;
-        
-        setAuthError(`${roleMsg} To fix this, go to the Firestore Console, find your document in the 'users' collection (ID: ${user.uid}), and add a field "role" with the value "Admin".`);
       } else {
-        // Authenticated but no document exists at all
-        setAuthError(`Authenticated as ${user.email}, but no profile was found in Firestore. A new profile will be created the first time you sign in.`);
+        // Authenticated but NOT an admin
+        const msg = role 
+          ? `Access Denied. Your current role is "${role}". Admins only.` 
+          : `Access Denied. Your account (UID: ${user.uid}) is missing the "role" field in Firestore. Please add role: "Admin" to your document.`;
+        
+        setAuthError(msg);
       }
     }
   }, [user, isUserLoading, userProfile, isProfileLoading, router]);
@@ -66,7 +66,7 @@ export default function AdminLogin() {
     if (user?.uid) {
       navigator.clipboard.writeText(user.uid);
       setCopied(true);
-      toast({ title: "UID Copied", description: "Use this as the Document ID in Firestore." });
+      toast({ title: "UID Copied", description: "Add this ID to your 'users' collection in Firestore." });
       setTimeout(() => setCopied(false), 2000);
     }
   };
@@ -97,7 +97,7 @@ export default function AdminLogin() {
 
         toast({
           title: "Sign-in successful",
-          description: "Checking database permissions..."
+          description: "Verifying administrative permissions..."
         });
       } else {
         await auth.signOut();
@@ -120,10 +120,6 @@ export default function AdminLogin() {
     try {
       await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, email, password);
-      toast({
-        title: "Signed in",
-        description: "Checking permissions..."
-      });
     } catch (error: any) {
       setAuthError(error.message);
     } finally {
@@ -135,7 +131,7 @@ export default function AdminLogin() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
         <Loader2 className="w-10 h-10 text-primary animate-spin" />
-        <p className="mt-4 text-muted-foreground font-bold tracking-tight">Verifying Credentials...</p>
+        <p className="mt-4 text-muted-foreground font-bold tracking-tight">Checking Permissions...</p>
       </div>
     );
   }
