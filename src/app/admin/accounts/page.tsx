@@ -65,7 +65,6 @@ export default function AccountManagement() {
   const { toast } = useToast();
   
   // UI State
-  const [searchTerm, setSearchTerm] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -74,6 +73,7 @@ export default function AccountManagement() {
   const [userToDelete, setUserToDelete] = useState<any>(null);
   
   // Sorting and Filtering State
+  const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<string>('name-asc');
   const [filterCollege, setFilterCollege] = useState<string>('all');
   const [filterRole, setFilterRole] = useState<string>('all');
@@ -86,7 +86,10 @@ export default function AccountManagement() {
     role: 'Student'
   });
 
-  // Safety fix for Radix UI freezing: ensure pointer events are re-enabled
+  /**
+   * SAFETY FIX: Prevents the UI from freezing after a modal action.
+   * Radix UI sometimes fails to restore pointer-events to the body.
+   */
   useEffect(() => {
     if (!isAddOpen && !isEditOpen && !isDeleteOpen) {
       document.body.style.pointerEvents = 'auto';
@@ -644,7 +647,7 @@ export default function AccountManagement() {
         </Dialog>
 
         {/* Delete Confirmation Alert */}
-        <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <AlertDialog open={isDeleteOpen} onOpenChange={(open) => { setIsDeleteOpen(open); if (!open) setUserToDelete(null); }}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>

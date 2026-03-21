@@ -9,7 +9,8 @@ import {
   Calendar,
   ChevronDown,
   User,
-  GraduationCap
+  GraduationCap,
+  IdCard
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -43,7 +44,7 @@ export default function VisitorLogPage() {
 
   const { data: visits, isLoading: isVisitsLoading } = useCollection(visitsQuery);
 
-  // Fetch Users for cross-referencing college
+  // Fetch Users for cross-referencing college and ID number
   const usersRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return collection(firestore, 'users');
@@ -58,7 +59,8 @@ export default function VisitorLogPage() {
       const userProfile = users?.find(u => u.institutionalEmail?.toLowerCase().trim() === visitorEmail);
       return {
         ...visit,
-        college: userProfile?.college || 'External/Unregistered'
+        college: userProfile?.college || 'External/Unregistered',
+        idNumber: userProfile?.idNumber || 'N/A'
       };
     });
   }, [visits, users]);
@@ -67,7 +69,8 @@ export default function VisitorLogPage() {
     let result = enrichedVisits.filter(visit => 
       visit.visitorEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       visit.purpose?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      visit.college?.toLowerCase().includes(searchTerm.toLowerCase())
+      visit.college?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (visit as any).idNumber?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     if (filterPurpose !== 'all') {
@@ -99,9 +102,10 @@ export default function VisitorLogPage() {
   const exportToCSV = () => {
     if (!filteredVisits || filteredVisits.length === 0) return;
     
-    const headers = ["Visitor Email", "College", "Purpose", "Entry Time", "Status"];
+    const headers = ["Visitor Email", "ID Number", "College", "Purpose", "Entry Time", "Status"];
     const rows = filteredVisits.map(v => [
       v.visitorEmail,
+      (v as any).idNumber,
       v.college,
       v.purpose,
       v.entryTime?.toDate ? format(v.entryTime.toDate(), 'PPP p') : 'Pending',
@@ -145,7 +149,7 @@ export default function VisitorLogPage() {
           <div className="md:col-span-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input 
-              placeholder="Search Email, Purpose or College..." 
+              placeholder="Search Email, ID, or Purpose..." 
               className="pl-10 h-11 bg-secondary/30"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -205,7 +209,8 @@ export default function VisitorLogPage() {
           <Table>
             <TableHeader className="bg-secondary/50">
               <TableRow>
-                <TableHead className="font-bold px-6">Visitor Email</TableHead>
+                <TableHead className="font-bold px-6">ID Number</TableHead>
+                <TableHead className="font-bold">Visitor Email</TableHead>
                 <TableHead className="font-bold">College</TableHead>
                 <TableHead className="font-bold">Purpose</TableHead>
                 <TableHead className="font-bold">Entry Date & Time</TableHead>
@@ -215,7 +220,7 @@ export default function VisitorLogPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-20">
+                  <TableCell colSpan={6} className="text-center py-20">
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                       <p className="text-muted-foreground font-bold italic">Gathering Library Records...</p>
@@ -224,14 +229,20 @@ export default function VisitorLogPage() {
                 </TableRow>
               ) : filteredVisits.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-20 text-muted-foreground italic">
+                  <TableCell colSpan={6} className="text-center py-20 text-muted-foreground italic">
                     No visit records match the current criteria.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredVisits.map((visit) => (
+                filteredVisits.map((visit: any) => (
                   <TableRow key={visit.id} className="hover:bg-primary/5 transition-colors">
-                    <TableCell className="px-6">
+                    <TableCell className="px-6 font-mono text-xs font-bold text-primary">
+                      <div className="flex items-center gap-2">
+                        <IdCard className="w-3 h-3 opacity-50" />
+                        {visit.idNumber}
+                      </div>
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                           <User className="w-4 h-4 text-primary" />
