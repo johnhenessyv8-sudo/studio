@@ -40,6 +40,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirestore, useCollection, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError, useAuth } from '@/firebase';
@@ -48,18 +58,21 @@ import { useToast } from '@/hooks/use-toast';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'firebase/auth';
 import { firebaseConfig } from '@/firebase/config';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function AccountManagement() {
   const { user } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
+  
+  // UI State
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [userToDelete, setUserToDelete] = useState<any>(null);
   
   // Sorting and Filtering State
   const [sortBy, setSortBy] = useState<string>('name-asc');
@@ -162,6 +175,7 @@ export default function AccountManagement() {
         description: "User details have been saved successfully."
       });
       setIsEditOpen(false);
+      setEditingUser(null);
     } catch (error: any) {
       const permissionError = new FirestorePermissionError({
         path: `users/${editingUser.id}`,
@@ -191,39 +205,53 @@ export default function AccountManagement() {
     }
   };
 
-  const handleToggleActive = (userItem: any) => {
-    if (!firestore) return;
-    const userRef = doc(firestore, 'users', userItem.id);
-    const newData = { isActive: !userItem.isActive, updatedAt: serverTimestamp() };
+  const handleToggleActive = async (userItem: any) => {
+    if (!firestore || isSaving) return;
     
-    updateDoc(userRef, newData)
-      .catch(async () => {
-        const permissionError = new FirestorePermissionError({
-          path: userRef.path,
-          operation: 'update',
-          requestResourceData: newData,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      });
-  };
-
-  const handleDeleteUser = async (userItem: any) => {
-    if (!firestore) return;
-    if (!window.confirm(`Are you sure you want to permanently delete ${userItem.fullName}? This action cannot be undone.`)) return;
-    
+    setIsSaving(true);
     try {
       const userRef = doc(firestore, 'users', userItem.id);
-      await deleteDoc(userRef);
+      const newData = { isActive: !userItem.isActive, updatedAt: serverTimestamp() };
+      await updateDoc(userRef, newData);
+      
       toast({
-        title: "User Deleted",
-        description: `${userItem.fullName} has been removed from the database.`
+        title: userItem.isActive ? "User Blocked" : "User Reactivated",
+        description: `${userItem.fullName}'s status has been updated.`
       });
     } catch (error: any) {
       const permissionError = new FirestorePermissionError({
         path: `users/${userItem.id}`,
+        operation: 'update',
+        requestResourceData: { isActive: !userItem.isActive },
+      });
+      errorEmitter.emit('permission-error', permissionError);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!firestore || !userToDelete || isSaving) return;
+    
+    setIsSaving(true);
+    try {
+      const userRef = doc(firestore, 'users', userToDelete.id);
+      await deleteDoc(userRef);
+      
+      toast({
+        title: "User Deleted",
+        description: `${userToDelete.fullName} has been permanently removed.`
+      });
+      setIsDeleteOpen(false);
+      setUserToDelete(null);
+    } catch (error: any) {
+      const permissionError = new FirestorePermissionError({
+        path: `users/${userToDelete.id}`,
         operation: 'delete',
       });
       errorEmitter.emit('permission-error', permissionError);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -515,14 +543,15 @@ export default function AccountManagement() {
                             <DropdownMenuItem onClick={() => { setEditingUser(u); setIsEditOpen(true); }}>
                               <Edit2 className="w-4 h-4 mr-2 text-primary" /> Edit Profile
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleToggleActive(u)}>
-                              <Ban className="w-4 h-4 mr-2 text-accent" /> {u.isActive ? 'Block User' : 'Unblock User'}
+                            <DropdownMenuItem onClick={() => handleToggleActive(u)} disabled={isSaving}>
+                              {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Ban className="w-4 h-4 mr-2 text-accent" />}
+                              {u.isActive ? 'Block User' : 'Unblock User'}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleResetPassword(u.institutionalEmail)}>
                               <Key className="w-4 h-4 mr-2 text-blue-500" /> Reset Password
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive focus:bg-destructive/10" onClick={() => handleDeleteUser(u)}>
+                            <DropdownMenuItem className="text-destructive focus:bg-destructive/10" onClick={() => { setUserToDelete(u); setIsDeleteOpen(true); }}>
                               <Trash2 className="w-4 h-4 mr-2" /> Delete Account
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -537,7 +566,7 @@ export default function AccountManagement() {
         </div>
 
         {/* Edit Dialog */}
-        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <Dialog open={isEditOpen} onOpenChange={(open) => { setIsEditOpen(open); if (!open) setEditingUser(null); }}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>Edit User Profile</DialogTitle>
@@ -607,6 +636,30 @@ export default function AccountManagement() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Alert */}
+        <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete the account for <b>{userToDelete?.fullName}</b>. 
+                This action cannot be undone and will remove all associated profile data from the library records.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleDeleteUser} 
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={isSaving}
+              >
+                {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Trash2 className="mr-2 w-4 h-4" />}
+                Permanently Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AdminLayout>
   );
