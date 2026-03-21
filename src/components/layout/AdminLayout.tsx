@@ -35,19 +35,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
-  // Authorization check
+  // Determine if we are still waiting for authentication OR the profile data
+  // We explicitly check !!user to see if we should be expecting profile data
+  const isAuthorizing = isUserLoading || (!!user && isProfileLoading);
+  
   const role = userProfile?.role;
   const isAdmin = role === 'Admin' || role === 'Librarian';
 
   useEffect(() => {
-    // Only attempt redirection once we are ABSOLUTELY sure about the load state
-    if (!isUserLoading && !isProfileLoading) {
+    // Only act once all loading states are settled
+    if (!isAuthorizing) {
       if (!user || !isAdmin) {
-        // Not logged in or not authorized -> send back to login
         router.replace('/admin/login');
       }
     }
-  }, [user, isUserLoading, isProfileLoading, isAdmin, router]);
+  }, [user, isAuthorizing, isAdmin, router]);
 
   const handleLogout = async () => {
     if (!auth) return;
@@ -59,18 +61,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   };
 
-  // While we are checking auth or loading the profile, show a full-page loader
-  if (isUserLoading || (user && isProfileLoading)) {
+  if (isAuthorizing) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
         <h2 className="text-xl font-bold font-headline">Verifying Permissions</h2>
-        <p className="text-muted-foreground mt-2 italic">Connecting to NEU Library Secure Portal...</p>
+        <p className="text-muted-foreground mt-2 italic">Syncing Firestore Profile...</p>
       </div>
     );
   }
 
-  // Final safety check: if we aren't authorized, don't render the dashboard at all
+  // Safety guard: if not authorized, don't show children
   if (!user || !isAdmin) {
     return null;
   }
@@ -83,7 +84,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      {/* Sidebar */}
       <aside className="fixed left-0 top-0 bottom-0 w-64 border-r bg-card flex flex-col p-6 z-40">
         <div className="flex items-center gap-3 mb-10">
           <div className="relative w-10 h-10 overflow-hidden rounded-full p-1 bg-white border border-primary/20">
@@ -141,7 +141,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 ml-64 p-8">
         {children}
       </main>
