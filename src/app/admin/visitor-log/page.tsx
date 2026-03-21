@@ -57,14 +57,14 @@ export default function VisitorLogPage() {
   const [filterCollege, setFilterCollege] = useState<string>('all');
 
   /**
-   * SAFETY FIX: Prevents the UI from freezing after a modal action.
+   * SAFETY FIX: Prevents the UI from remaining unclickable after a modal action.
    * Forces the body to be interactive when all overlays are closed.
    */
   useEffect(() => {
     if (!isDeleteOpen) {
       const timeoutId = setTimeout(() => {
         document.body.style.pointerEvents = 'auto';
-      }, 150);
+      }, 100);
       return () => clearTimeout(timeoutId);
     }
   }, [isDeleteOpen]);

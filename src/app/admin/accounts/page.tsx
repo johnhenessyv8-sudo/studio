@@ -87,14 +87,14 @@ export default function AccountManagement() {
   });
 
   /**
-   * SAFETY FIX: Prevents the UI from freezing after a modal action.
-   * Forces the body to be interactive when all overlays are closed.
+   * SAFETY FIX: Prevents the UI from remaining unclickable after a modal action.
+   * This forces the body to be interactive when all overlays are closed.
    */
   useEffect(() => {
     if (!isAddOpen && !isEditOpen && !isDeleteOpen) {
       const timeoutId = setTimeout(() => {
         document.body.style.pointerEvents = 'auto';
-      }, 150);
+      }, 100);
       return () => clearTimeout(timeoutId);
     }
   }, [isAddOpen, isEditOpen, isDeleteOpen]);
