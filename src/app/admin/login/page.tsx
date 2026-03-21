@@ -17,7 +17,7 @@ import {
   browserLocalPersistence
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -35,7 +35,6 @@ export default function AdminLogin() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Use the useDoc hook to reactively check the user's role in Firestore
   const userDocRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return doc(firestore, 'users', user.uid);
@@ -43,16 +42,22 @@ export default function AdminLogin() {
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
-  // Handle redirects based on both Auth state AND Firestore role
   useEffect(() => {
     if (!isUserLoading && user && !isProfileLoading) {
-      if (userProfile && (userProfile.role === 'Admin' || userProfile.role === 'Librarian')) {
+      const isAdmin = userProfile && (userProfile.role === 'Admin' || userProfile.role === 'Librarian');
+      
+      if (isAdmin) {
         router.replace('/admin/dashboard');
       } else if (userProfile) {
-        setAuthError(`Access Denied. Your account is registered as '${userProfile.role}'. Only Admins or Librarians can access this portal.`);
+        // User exists but has no role or wrong role
+        const roleMsg = userProfile.role 
+          ? `Access Denied. Your current role is "${userProfile.role}".` 
+          : `Access Denied. Your account has no "role" assigned.`;
+        
+        setAuthError(`${roleMsg} To fix this, go to the Firestore Console, find your document in the 'users' collection (ID: ${user.uid}), and add a field "role" with the value "Admin".`);
       } else {
-        // Authenticated but document doesn't exist or has no role
-        setAuthError(`Authenticated as ${user.email}, but no Admin profile was found in the database. Please ensure your UID is registered in the 'users' collection with the 'role' field set to 'Admin'.`);
+        // Authenticated but no document exists at all
+        setAuthError(`Authenticated as ${user.email}, but no profile was found in Firestore. A new profile will be created the first time you sign in.`);
       }
     }
   }, [user, isUserLoading, userProfile, isProfileLoading, router]);
@@ -61,7 +66,7 @@ export default function AdminLogin() {
     if (user?.uid) {
       navigator.clipboard.writeText(user.uid);
       setCopied(true);
-      toast({ title: "UID Copied", description: "You can now paste this into the Firebase Console." });
+      toast({ title: "UID Copied", description: "Use this as the Document ID in Firestore." });
       setTimeout(() => setCopied(false), 2000);
     }
   };
@@ -80,17 +85,18 @@ export default function AdminLogin() {
       const loggedUser = result.user;
 
       if (loggedUser.email?.toLowerCase().endsWith('@neu.edu.ph')) {
-        // Sync user profile: we merge so we don't overwrite an existing 'role' if they already have one
         const userRef = doc(firestore, 'users', loggedUser.uid);
+        // Sync basic info, but DON'T overwrite existing role if it exists
         await setDoc(userRef, {
           id: loggedUser.uid,
           fullName: loggedUser.displayName,
           institutionalEmail: loggedUser.email,
           updatedAt: serverTimestamp(),
+          isActive: true
         }, { merge: true });
 
         toast({
-          title: "Authorized successfully",
+          title: "Sign-in successful",
           description: "Checking database permissions..."
         });
       } else {
@@ -129,7 +135,7 @@ export default function AdminLogin() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
         <Loader2 className="w-10 h-10 text-primary animate-spin" />
-        <p className="mt-4 text-muted-foreground font-bold tracking-tight">Authenticating Administrator...</p>
+        <p className="mt-4 text-muted-foreground font-bold tracking-tight">Verifying Credentials...</p>
       </div>
     );
   }
@@ -156,12 +162,12 @@ export default function AdminLogin() {
           {authError && (
             <Alert variant="destructive" className="mb-6 bg-destructive/10 border-destructive/20 text-destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle className="font-bold">Access Check Failed</AlertTitle>
+              <AlertTitle className="font-bold">Access Denied</AlertTitle>
               <AlertDescription className="text-xs mt-2 space-y-3">
                 <p>{authError}</p>
                 {user && (
                   <div className="pt-2 border-t border-destructive/20">
-                    <p className="font-bold mb-1">Your UID (Copy this to Firestore):</p>
+                    <p className="font-bold mb-1">Your UID (Document ID):</p>
                     <div className="flex items-center gap-2">
                       <code className="bg-background/50 p-1.5 rounded flex-1 truncate">{user.uid}</code>
                       <Button size="icon" variant="outline" className="h-8 w-8 shrink-0" onClick={copyToClipboard}>

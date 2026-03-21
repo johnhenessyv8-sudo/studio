@@ -34,16 +34,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
-  // Guarded redirect: Redirect if not logged in OR if profile doesn't have allowed role
   useEffect(() => {
+    // Only redirect once we are sure about the loading state
     if (!isUserLoading) {
       if (!user) {
-        router.replace('/admin/login');
+        // Not logged in at all
+        if (pathname !== '/admin/login') {
+          router.replace('/admin/login');
+        }
       } else if (!isProfileLoading) {
-        // Only redirect if we ARE NOT already on the login page
-        // and we have confirmed they are not an admin
+        // Logged in, profile loaded. Check role.
         const isAdmin = userProfile && (userProfile.role === 'Admin' || userProfile.role === 'Librarian');
+        
         if (!isAdmin && pathname !== '/admin/login') {
+          // Logged in but not authorized
           router.replace('/admin/login');
         }
       }
@@ -60,7 +64,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   };
 
-  // While checking auth state or profile role, show a consistent full-page loader
   if (isUserLoading || (user && isProfileLoading)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -72,9 +75,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  // If role is not valid, don't show the layout and let the useEffect handle the redirect
+  // Final access check
   const isAdmin = userProfile && (userProfile.role === 'Admin' || userProfile.role === 'Librarian');
+  
   if (!user || !isAdmin) {
+    // If not admin, the useEffect above handles the redirect
+    // We render nothing to prevent UI flashing
     return null;
   }
 
@@ -129,7 +135,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="px-4">
             <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-1">Signed in as</p>
             <p className="text-sm font-bold truncate text-primary">{userProfile?.fullName || user.displayName || user.email}</p>
-            <p className="text-[10px] text-muted-foreground uppercase font-black">{userProfile?.role}</p>
+            <p className="text-[10px] text-muted-foreground uppercase font-black">{userProfile?.role || 'Visitor'}</p>
           </div>
           <Button 
             variant="ghost" 
