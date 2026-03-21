@@ -46,10 +46,10 @@ export default function Dashboard() {
     return collection(firestore, 'users');
   }, [firestore, user]);
   
-  const { data: users } = useCollection(usersRef);
+  const { data: users, isLoading: isUsersLoading } = useCollection(usersRef);
 
   const stats = useMemo(() => {
-    if (!visits) return { today: 0, week: 0, month: 0, purposeData: [], collegeData: [], recent: [] };
+    if (!visits || !users) return { today: 0, week: 0, month: 0, purposeData: [], collegeData: [], recent: [] };
 
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -77,10 +77,14 @@ export default function Dashboard() {
       if (entryTime >= weekStart) weekCount++;
       if (entryTime >= monthStart) monthCount++;
 
-      purposes[v.purpose] = (purposes[v.purpose] || 0) + 1;
+      if (v.purpose) {
+        purposes[v.purpose] = (purposes[v.purpose] || 0) + 1;
+      }
 
-      const userProfile = users?.find(u => u.institutionalEmail?.toLowerCase() === v.visitorEmail?.toLowerCase());
-      const college = userProfile?.college || 'Others';
+      // Robust lookup by email (case-insensitive)
+      const visitorEmail = v.visitorEmail?.toLowerCase().trim();
+      const userProfile = users?.find(u => u.institutionalEmail?.toLowerCase().trim() === visitorEmail);
+      const college = userProfile?.college || 'External/Unknown';
       colleges[college] = (colleges[college] || 0) + 1;
     });
 
@@ -107,11 +111,38 @@ export default function Dashboard() {
     };
   }, [visits, users]);
 
-  if (isVisitsLoading) {
+  const exportToCSV = () => {
+    if (!visits || visits.length === 0) return;
+    
+    const headers = ["Visitor Email", "College", "Purpose", "Entry Time"];
+    const rows = visits.map(v => {
+      const userProfile = users?.find(u => u.institutionalEmail?.toLowerCase() === v.visitorEmail?.toLowerCase());
+      return [
+        v.visitorEmail,
+        userProfile?.college || "N/A",
+        v.purpose,
+        v.entryTime?.toDate ? format(v.entryTime.toDate(), 'PPP p') : 'N/A'
+      ];
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `NEU_Library_Full_Report_${new Date().toLocaleDateString()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  if (isVisitsLoading || isUsersLoading) {
     return (
       <AdminLayout>
-        <div className="flex items-center justify-center h-[60vh]">
-          <Loader2 className="w-10 h-10 animate-spin text-primary" />
+        <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+          <Loader2 className="w-12 h-12 animate-spin text-primary" />
+          <p className="text-muted-foreground font-bold italic">Synchronizing Library Records...</p>
         </div>
       </AdminLayout>
     );
@@ -125,8 +156,12 @@ export default function Dashboard() {
             <h1 className="text-4xl font-black tracking-tight text-foreground font-headline">Library Dashboard</h1>
             <p className="text-muted-foreground italic">New Era University Real-time Analytics</p>
           </div>
-          <Button variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white font-bold h-11">
-            <FileDown className="mr-2 w-4 h-4" /> Export Report
+          <Button 
+            onClick={exportToCSV}
+            variant="outline" 
+            className="border-primary text-primary hover:bg-primary hover:text-white font-bold h-11"
+          >
+            <FileDown className="mr-2 w-4 h-4" /> Export Full Report
           </Button>
         </div>
 
@@ -179,11 +214,13 @@ export default function Dashboard() {
                         data={stats.collegeData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={70}
-                        outerRadius={100}
-                        paddingAngle={8}
+                        innerRadius={65}
+                        outerRadius={95}
+                        paddingAngle={5}
                         dataKey="value"
                         stroke="none"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        labelLine={false}
                       >
                         {stats.collegeData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
@@ -193,7 +230,7 @@ export default function Dashboard() {
                         contentStyle={{ backgroundColor: '#1A1608', border: '1px solid #DEB731', borderRadius: '12px', fontSize: '12px' }}
                         itemStyle={{ color: '#fff' }}
                       />
-                      <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold' }}/>
+                      <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold', paddingTop: '10px' }}/>
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
@@ -213,14 +250,21 @@ export default function Dashboard() {
               <div className="h-[320px] w-full">
                 {stats.purposeData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={stats.purposeData}>
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#888', fontSize: 10, fontWeight: 'bold' }} />
-                      <YAxis hide />
+                    <BarChart data={stats.purposeData} layout="vertical" margin={{ left: 20 }}>
+                      <XAxis type="number" hide />
+                      <YAxis 
+                        dataKey="name" 
+                        type="category" 
+                        width={100} 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fill: '#888', fontSize: 10, fontWeight: 'bold' }} 
+                      />
                       <Tooltip 
                         cursor={{ fill: 'rgba(255,255,255,0.03)' }}
                         contentStyle={{ backgroundColor: '#1A1608', border: '1px solid #DEB731', borderRadius: '12px' }}
                       />
-                      <Bar dataKey="count" radius={[12, 12, 0, 0]} barSize={40}>
+                      <Bar dataKey="count" radius={[0, 12, 12, 0]} barSize={30}>
                         {stats.purposeData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#DEB731' : '#ED7D58'} />
                         ))}
