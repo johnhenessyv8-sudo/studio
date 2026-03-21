@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, doc, serverTimestamp, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { initializeApp, deleteApp } from 'firebase/app';
@@ -44,6 +44,7 @@ import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth'
 import { firebaseConfig } from '@/firebase/config';
 
 export default function AccountManagement() {
+  const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
@@ -59,9 +60,9 @@ export default function AccountManagement() {
   });
 
   const usersRef = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !user) return null;
     return collection(firestore, 'users');
-  }, [firestore]);
+  }, [firestore, user]);
 
   const { data: users, isLoading } = useCollection(usersRef);
 
@@ -81,8 +82,6 @@ export default function AccountManagement() {
     setIsSaving(true);
 
     try {
-      // 1. Create Auth Account with default password 'mypassword123'
-      // We use a secondary Firebase instance to avoid logging out the current admin
       const secondaryAppName = `secondary-app-${Date.now()}`;
       const secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
       const secondaryAuth = getAuth(secondaryApp);
@@ -90,11 +89,9 @@ export default function AccountManagement() {
       const authUser = await createUserWithEmailAndPassword(secondaryAuth, formData.email.toLowerCase(), "mypassword123");
       const uid = authUser.user.uid;
 
-      // Clean up secondary instance
       await signOut(secondaryAuth);
       await deleteApp(secondaryApp);
 
-      // 2. Create Firestore Profile
       const userRef = doc(firestore, 'users', uid);
       const data = {
         id: uid,
@@ -118,7 +115,6 @@ export default function AccountManagement() {
       setIsDialogOpen(false);
       setFormData({ fullName: '', email: '', idNumber: '', college: '', role: 'Student' });
     } catch (error: any) {
-      console.error("User creation error:", error);
       toast({
         variant: "destructive",
         title: "Creation Failed",
@@ -129,10 +125,10 @@ export default function AccountManagement() {
     }
   };
 
-  const handleToggleActive = (user: any) => {
+  const handleToggleActive = (userItem: any) => {
     if (!firestore) return;
-    const userRef = doc(firestore, 'users', user.id);
-    const newData = { isActive: !user.isActive, updatedAt: serverTimestamp() };
+    const userRef = doc(firestore, 'users', userItem.id);
+    const newData = { isActive: !userItem.isActive, updatedAt: serverTimestamp() };
     
     updateDoc(userRef, newData)
       .catch(async () => {
@@ -145,9 +141,9 @@ export default function AccountManagement() {
       });
   };
 
-  const handleDeleteUser = (user: any) => {
-    if (!firestore || !window.confirm(`Are you sure you want to delete ${user.fullName}?`)) return;
-    const userRef = doc(firestore, 'users', user.id);
+  const handleDeleteUser = (userItem: any) => {
+    if (!firestore || !window.confirm(`Are you sure you want to delete ${userItem.fullName}?`)) return;
+    const userRef = doc(firestore, 'users', userItem.id);
     
     deleteDoc(userRef)
       .catch(async () => {
@@ -159,10 +155,10 @@ export default function AccountManagement() {
       });
   };
 
-  const filteredUsers = users?.filter(user => 
-    user.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.idNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.institutionalEmail?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredUsers = users?.filter(u => 
+    u.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.idNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.institutionalEmail?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -288,7 +284,6 @@ export default function AccountManagement() {
           </div>
         </div>
 
-        {/* Controls Bar */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-6 bg-card border rounded-2xl shadow-lg">
           <div className="md:col-span-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -348,7 +343,6 @@ export default function AccountManagement() {
           </DropdownMenu>
         </div>
 
-        {/* Table Section */}
         <div className="bg-card border rounded-2xl overflow-hidden shadow-xl">
           <Table>
             <TableHeader className="bg-secondary/50">
@@ -371,19 +365,19 @@ export default function AccountManagement() {
                   <TableCell colSpan={6} className="text-center py-10">No users found.</TableCell>
                 </TableRow>
               ) : (
-                filteredUsers?.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-mono text-xs">{user.idNumber || user.id}</TableCell>
-                    <TableCell className="font-bold text-primary">{user.fullName}</TableCell>
-                    <TableCell className="text-xs">{user.college || 'N/A'}</TableCell>
+                filteredUsers?.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-mono text-xs">{u.idNumber || u.id}</TableCell>
+                    <TableCell className="font-bold text-primary">{u.fullName}</TableCell>
+                    <TableCell className="text-xs">{u.college || 'N/A'}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-[10px] uppercase border-accent text-accent">
-                        {user.role}
+                        {u.role}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge className={user.isActive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}>
-                        {user.isActive ? 'Active' : 'Blocked'}
+                      <Badge className={u.isActive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}>
+                        {u.isActive ? 'Active' : 'Blocked'}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -392,8 +386,8 @@ export default function AccountManagement() {
                           variant="ghost" 
                           size="icon" 
                           className="text-muted-foreground hover:text-accent hover:bg-accent/10" 
-                          title={user.isActive ? "Block User" : "Activate User"}
-                          onClick={() => handleToggleActive(user)}
+                          title={u.isActive ? "Block User" : "Activate User"}
+                          onClick={() => handleToggleActive(u)}
                         >
                           <Ban className="w-4 h-4" />
                         </Button>
@@ -402,7 +396,7 @@ export default function AccountManagement() {
                           size="icon" 
                           className="text-muted-foreground hover:text-destructive hover:bg-destructive/10" 
                           title="Delete User"
-                          onClick={() => handleDeleteUser(user)}
+                          onClick={() => handleDeleteUser(u)}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>

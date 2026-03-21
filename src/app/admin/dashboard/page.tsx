@@ -26,24 +26,25 @@ import {
 } from 'recharts';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import { startOfWeek, startOfMonth, format } from 'date-fns';
 
 export default function Dashboard() {
+  const { user } = useUser();
   const firestore = useFirestore();
 
   const visitsRef = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !user) return null;
     return collection(firestore, 'visits');
-  }, [firestore]);
+  }, [firestore, user]);
   
   const { data: visits, isLoading: isVisitsLoading } = useCollection(visitsRef);
 
   const usersRef = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !user) return null;
     return collection(firestore, 'users');
-  }, [firestore]);
+  }, [firestore, user]);
   
   const { data: users } = useCollection(usersRef);
 

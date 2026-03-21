@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react';
@@ -21,18 +20,19 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { format } from 'date-fns';
 
 export default function VisitorLogPage() {
+  const { user } = useUser();
   const firestore = useFirestore();
   const [searchTerm, setSearchTerm] = useState('');
 
   const visitsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !user) return null;
     return query(collection(firestore, 'visits'), orderBy('entryTime', 'desc'), limit(100));
-  }, [firestore]);
+  }, [firestore, user]);
 
   const { data: visits, isLoading } = useCollection(visitsQuery);
 
