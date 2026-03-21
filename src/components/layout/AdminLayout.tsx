@@ -1,43 +1,96 @@
 
 "use client";
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, 
   ClipboardList, 
   Users, 
   LogOut, 
-  Library 
+  Lock 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useAuth } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { auth } = useAuth();
+  const { user, isUserLoading } = useUser();
+  const { firestore } = useFirestore();
   const logo = PlaceHolderImages.find(img => img.id === 'neu-logo');
 
+  const adminRoleRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'roles_admin', user.uid);
+  }, [firestore, user]);
+
+  const librarianRoleRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'roles_librarian', user.uid);
+  }, [firestore, user]);
+
+  const { data: adminRole, isLoading: isAdminLoading } = useDoc(adminRoleRef);
+  const { data: librarianRole, isLoading: isLibrarianLoading } = useDoc(librarianRoleRef);
+
+  const isAdmin = !!adminRole;
+  const isLibrarian = !!librarianRole;
+  const isAuthorized = isAdmin || isLibrarian;
+
+  useEffect(() => {
+    if (!isUserLoading && !isAdminLoading && !isLibrarianLoading) {
+      if (!user || !isAuthorized) {
+        router.push('/admin/login');
+      }
+    }
+  }, [user, isUserLoading, isAdminLoading, isLibrarianLoading, isAuthorized, router]);
+
+  const handleLogout = async () => {
+    if (!auth) return;
+    await signOut(auth);
+    router.push('/');
+  };
+
+  if (isUserLoading || isAdminLoading || isLibrarianLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-muted-foreground font-bold">Verifying Credentials...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || !isAuthorized) {
+    return null; // Redirect handled by useEffect
+  }
+
   const navItems = [
-    { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-    { name: 'Visitor Log', href: '/admin/visitor-log', icon: ClipboardList },
-    { name: 'Account Management', href: '/admin/accounts', icon: Users },
-  ];
+    { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard, access: 'all' },
+    { name: 'Visitor Log', href: '/admin/visitor-log', icon: ClipboardList, access: 'all' },
+    { name: 'Account Management', href: '/admin/accounts', icon: Users, access: 'admin' },
+  ].filter(item => item.access === 'all' || (item.access === 'admin' && isAdmin));
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 bottom-0 w-64 border-r bg-card flex flex-col p-6 z-40">
         <div className="flex items-center gap-3 mb-10">
-          <div className="relative w-10 h-10 overflow-hidden rounded-full">
+          <div className="relative w-10 h-10 overflow-hidden rounded-full p-1 bg-white">
             {logo && (
               <Image 
                 src={logo.imageUrl} 
                 alt="NEU Logo" 
                 fill 
-                className="object-cover"
+                className="object-contain"
                 data-ai-hint="university logo"
               />
             )}
@@ -69,18 +122,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <div className="pt-6 border-t space-y-4">
           <div className="px-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-1">Admin Email</p>
-            <p className="text-sm font-medium truncate">admin@neu.edu.ph</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-1">Signed in as</p>
+            <p className="text-sm font-bold truncate text-primary">{user.displayName || 'Staff'}</p>
+            <p className="text-[10px] text-muted-foreground truncate uppercase font-bold tracking-tighter">
+              {isAdmin ? 'Administrator' : 'Librarian'}
+            </p>
           </div>
           <Button 
             variant="ghost" 
-            className="w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive"
-            asChild
+            className="w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive font-bold"
+            onClick={handleLogout}
           >
-            <Link href="/">
-              <LogOut className="mr-3 w-5 h-5" />
-              Logout
-            </Link>
+            <LogOut className="mr-3 w-5 h-5" />
+            Logout
           </Button>
         </div>
       </aside>

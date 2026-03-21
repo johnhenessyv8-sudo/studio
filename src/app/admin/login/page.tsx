@@ -1,21 +1,46 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { ArrowLeft, Lock, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Chrome } from 'lucide-react';
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { doc } from 'firebase/firestore';
 
 export default function AdminLogin() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const { auth, firestore } = useAuth();
+  const { user, isUserLoading } = useUser();
+  const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email.includes('admin')) {
-      window.location.href = '/admin/dashboard';
+  const adminRoleRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'roles_admin', user.uid);
+  }, [firestore, user]);
+
+  const librarianRoleRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'roles_librarian', user.uid);
+  }, [firestore, user]);
+
+  const { data: adminRole } = useDoc(adminRoleRef);
+  const { data: librarianRole } = useDoc(librarianRoleRef);
+
+  useEffect(() => {
+    if (!isUserLoading && user && (adminRole || librarianRole)) {
+      router.push('/admin/dashboard');
+    }
+  }, [user, isUserLoading, adminRole, librarianRole, router]);
+
+  const handleGoogleLogin = async () => {
+    if (!auth) return;
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Login failed", error);
     }
   };
 
@@ -38,39 +63,25 @@ export default function AdminLogin() {
             <p className="text-muted-foreground">Authorized NEU staff only.</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="email">Institutional Email</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                required 
-                placeholder="admin@neu.edu.ph"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="h-12 bg-secondary/30"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input 
-                id="password" 
-                type="password" 
-                required 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-12 bg-secondary/30"
-              />
-            </div>
-
-            <Button className="w-full h-12 font-bold text-lg">
-              <Lock className="mr-2 w-4 h-4" /> Secure Login
+          <div className="space-y-4">
+            <Button 
+              onClick={handleGoogleLogin}
+              className="w-full h-12 font-bold text-lg"
+              disabled={isUserLoading}
+            >
+              <Chrome className="mr-2 w-5 h-5" /> Login with Google
             </Button>
-          </form>
+            
+            {user && !adminRole && !librarianRole && !isUserLoading && (
+              <p className="text-sm text-destructive text-center font-bold animate-in fade-in slide-in-from-top-2">
+                Access Denied: You do not have administrator or librarian privileges.
+              </p>
+            )}
+          </div>
 
           <div className="mt-8 pt-6 border-t border-muted/20 text-center">
             <p className="text-sm text-muted-foreground italic">
-              Forgot password? Contact NEU IT Department.
+              Need access? Contact NEU IT Department.
             </p>
           </div>
         </div>

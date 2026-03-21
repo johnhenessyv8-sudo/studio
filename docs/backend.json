@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -101,8 +102,7 @@
   },
   "auth": {
     "providers": [
-      "password",
-      "anonymous"
+      "google.com"
     ]
   },
   "firestore": {
@@ -171,7 +171,6 @@
           ]
         }
       }
-    ],
-    "reasoning": "The Firestore structure is designed to be highly secure, scalable, and debuggable by strictly adhering to the core design principles and mandates. Authorization Independence is paramount, achieved primarily through denormalization and the 'Existence over Content' pattern for roles.\n\n1.  **User Profiles (`/users/{userId}`):** This top-level collection stores comprehensive details for each user, identified by their Firebase Authentication `uid`. Users can read their own profiles, while administrators have full read/write access for account management. The 'role' field within these documents is primarily for display and application logic; authorization relies on dedicated role collections.\n\n2.  **Role Collections (`/roles_admin/{userId}`, `/roles_librarian/{userId}`):** These collections implement the 'Existence over Content' pattern for DBAC (Database-Backed Access Control). A document's presence in `/roles_admin/{userId}` or `/roles_librarian/{userId}` explicitly grants 'admin' or 'librarian' privileges, respectively. This is a critical component for Authorization Independence, as security rules can check `exists(/roles_admin/$(request.auth.uid))` instead of making costly and non-atomic `get()` calls to user profiles. Only existing administrators can create or delete documents in these role collections.\n\n3.  **Visitor Logs (`/visits/{visitId}`):** This collection records every library visit. To ensure Authorization Independence, each `Visit` document includes `visitorId`, which is a denormalized copy of the `request.auth.uid` of the user who performed the check-in. This allows security rules to directly verify ownership during creation (`request.resource.data.visitorId == request.auth.uid`) without needing to fetch the user's profile. Visit records are designed to be immutable once created, preserving data integrity. This collection is crucial for QAPs (Query-Based Access Patterns) because administrators and librarians are granted direct `read` access to the entire collection (via their respective role checks). This enables them to perform `list` operations (e.g., retrieve all visits for a dashboard) without the need for security rules to filter results, which is inefficient and insecure. Any authenticated NEU user can create their own visit record.\n\nThis structure segregates data based on security posture (e.g., user profiles vs. visit logs vs. role assignments) and uses consistent naming conventions (`userId`, `visitId`, `ownerId` implicit in `visitorId`). The explicit modeling of roles via dedicated collections and the denormalization of `visitorId` directly into `Visit` documents ensures that security rules are simple, robust, and highly performant, fully supporting the principles of Authorization Independence and QAPs."
+    ]
   }
 }
