@@ -58,10 +58,14 @@ export default function VisitorLogPage() {
 
   /**
    * SAFETY FIX: Prevents the UI from freezing after a modal action.
+   * Forces the body to be interactive when all overlays are closed.
    */
   useEffect(() => {
     if (!isDeleteOpen) {
-      document.body.style.pointerEvents = 'auto';
+      const timeoutId = setTimeout(() => {
+        document.body.style.pointerEvents = 'auto';
+      }, 100);
+      return () => clearTimeout(timeoutId);
     }
   }, [isDeleteOpen]);
 
@@ -318,21 +322,23 @@ export default function VisitorLogPage() {
                       {visit.entryTime?.toDate ? format(visit.entryTime.toDate(), 'PPP p') : 'Processing...'}
                     </TableCell>
                     <TableCell className="text-center">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem 
-                            className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                            onSelect={(e) => { e.preventDefault(); setLogToDelete(visit); setIsDeleteOpen(true); }}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" /> Delete Record
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex items-center justify-center">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem 
+                              className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                              onSelect={(e) => { e.preventDefault(); setLogToDelete(visit); setIsDeleteOpen(true); }}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" /> Delete Record
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -352,7 +358,7 @@ export default function VisitorLogPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting} onClick={() => { setIsDeleteOpen(false); setLogToDelete(null); }}>Cancel</AlertDialogCancel>
             <Button 
               onClick={handleDeleteLog} 
               variant="destructive"
@@ -364,6 +370,6 @@ export default function VisitorLogPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </AdminLayout>
+    </div>
   );
 }

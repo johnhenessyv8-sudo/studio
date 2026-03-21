@@ -88,11 +88,14 @@ export default function AccountManagement() {
 
   /**
    * SAFETY FIX: Prevents the UI from freezing after a modal action.
-   * Radix UI sometimes fails to restore pointer-events to the body.
+   * Forces the body to be interactive when all overlays are closed.
    */
   useEffect(() => {
     if (!isAddOpen && !isEditOpen && !isDeleteOpen) {
-      document.body.style.pointerEvents = 'auto';
+      const timeoutId = setTimeout(() => {
+        document.body.style.pointerEvents = 'auto';
+      }, 100);
+      return () => clearTimeout(timeoutId);
     }
   }, [isAddOpen, isEditOpen, isDeleteOpen]);
 
