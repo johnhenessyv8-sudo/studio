@@ -6,14 +6,12 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, ShieldCheck, Chrome, Mail, Lock, Loader2, AlertCircle, Copy, Check } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Chrome, Mail, Lock, Loader2, AlertCircle, Copy, Check, Info } from 'lucide-react';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { 
   GoogleAuthProvider, 
   signInWithPopup, 
-  signInWithEmailAndPassword,
-  setPersistence,
-  browserLocalPersistence
+  signInWithEmailAndPassword
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -41,8 +39,8 @@ export default function AdminLogin() {
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
+  // Authorization check and redirect logic
   useEffect(() => {
-    // Only redirect to dashboard if auth is complete, profile is loaded, AND user is admin
     if (!isUserLoading && user && !isProfileLoading) {
       const role = userProfile?.role;
       const isAdmin = role === 'Admin' || role === 'Librarian';
@@ -50,10 +48,9 @@ export default function AdminLogin() {
       if (isAdmin) {
         router.replace('/admin/dashboard');
       } else if (userProfile) {
-        setAuthError(`Access Denied. Your account is active but has no Admin role. Current role: "${role || 'None'}".`);
+        setAuthError(`Access Denied. Your account is active but needs the "Admin" role. Current role: "${role || 'None'}".`);
       } else {
-        // Profile might be missing or still syncing
-        setAuthError(`Access Denied. No profile found for UID: ${user.uid}. Please add 'role: "Admin"' to your document.`);
+        setAuthError(`Access Denied. No profile found for UID: ${user.uid}. Please ensure your email is @neu.edu.ph and you are added to the users collection.`);
       }
     }
   }, [user, isUserLoading, userProfile, isProfileLoading, router]);
@@ -76,36 +73,20 @@ export default function AdminLogin() {
     provider.setCustomParameters({ prompt: 'select_account' });
 
     try {
-      await setPersistence(auth, browserLocalPersistence);
-      // Popup might get stuck in some environments, but useUser() will pick up the state change
-      const result = await signInWithPopup(auth, provider);
-      const loggedUser = result.user;
-
-      if (loggedUser.email?.toLowerCase().endsWith('@neu.edu.ph')) {
-        const userRef = doc(firestore, 'users', loggedUser.uid);
-        // Sync basic info, but DON'T overwrite existing role
-        await setDoc(userRef, {
-          id: loggedUser.uid,
-          fullName: loggedUser.displayName,
-          institutionalEmail: loggedUser.email,
-          updatedAt: serverTimestamp(),
-          isActive: true
-        }, { merge: true });
-
-        toast({
-          title: "Authenticated",
-          description: "Syncing your administrative profile..."
-        });
-      } else {
-        await auth.signOut();
-        setAuthError("Only @neu.edu.ph institutional accounts are allowed.");
-      }
+      // Note: We don't necessarily need to await the result if the popup gets stuck.
+      // The useUser() hook/FirebaseProvider will detect the auth state change globally.
+      await signInWithPopup(auth, provider);
+      
+      toast({
+        title: "Authenticated",
+        description: "Checking permissions..."
+      });
     } catch (error: any) {
-      if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
-        console.error("Auth error:", error);
+      if (error.code === 'auth/invalid-credential') {
+        setAuthError("Google Sign-In failed (Invalid Credential). This often happens if the current domain is not added to 'Authorized Domains' in your Firebase Console.");
+      } else if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
         setAuthError(error.message);
       }
-    } finally {
       setIsGoogleLoading(false);
     }
   };
@@ -116,22 +97,20 @@ export default function AdminLogin() {
     setIsSubmitting(true);
     setAuthError(null);
     try {
-      await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {
       setAuthError(error.message);
-    } finally {
       setIsSubmitting(false);
     }
   };
 
-  // If user is logged in and we are waiting for profile, show a loading state
+  // If we are definitely loading or have a user but are waiting for their profile
   if (isUserLoading || (user && isProfileLoading)) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-        <h2 className="text-xl font-bold">Verifying NEU Credentials</h2>
-        <p className="text-muted-foreground mt-2">Checking your administrative permissions...</p>
+        <h2 className="text-xl font-bold font-headline">Verifying NEU Credentials</h2>
+        <p className="text-muted-foreground mt-2 italic">Connecting to secure library portal...</p>
       </div>
     );
   }
@@ -145,7 +124,7 @@ export default function AdminLogin() {
       <div className="w-full max-w-md">
         <div className="bg-card border rounded-3xl p-8 shadow-2xl">
           <div className="flex justify-center mb-8">
-            <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center rotate-3">
+            <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center rotate-3 border border-primary/20">
               <ShieldCheck className="w-10 h-10 text-primary" />
             </div>
           </div>
@@ -161,17 +140,23 @@ export default function AdminLogin() {
               <AlertTitle className="font-bold">Access Check Failed</AlertTitle>
               <AlertDescription className="text-xs mt-2 space-y-3">
                 <p>{authError}</p>
+                {authError.includes('Authorized Domains') && (
+                  <div className="bg-background/40 p-3 rounded-lg flex gap-2 items-start mt-2">
+                    <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                    <p>Go to <strong>Authentication &gt; Settings</strong> in Firebase Console to add this port/domain.</p>
+                  </div>
+                )}
                 {user && (
                   <div className="pt-2 border-t border-destructive/20">
-                    <p className="font-bold mb-1">Your Document ID (UID):</p>
+                    <p className="font-bold mb-1">Your UID:</p>
                     <div className="flex items-center gap-2">
-                      <code className="bg-background/50 p-1.5 rounded flex-1 truncate font-mono">{user.uid}</code>
+                      <code className="bg-background/50 p-1.5 rounded flex-1 truncate font-mono text-[10px]">{user.uid}</code>
                       <Button size="icon" variant="outline" className="h-8 w-8 shrink-0" onClick={copyToClipboard}>
                         {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                       </Button>
                     </div>
-                    <p className="mt-3 opacity-80 leading-relaxed">
-                      Please ensure your document in the <strong className="underline">users</strong> collection has a field: <code className="bg-background/50 px-1 rounded">role: "Admin"</code>.
+                    <p className="mt-3 opacity-80 leading-relaxed italic">
+                      Add <code className="bg-background/50 px-1 rounded">role: "Admin"</code> to this ID in the users collection.
                     </p>
                   </div>
                 )}
@@ -188,7 +173,7 @@ export default function AdminLogin() {
             <TabsContent value="google" className="space-y-4">
               <Button 
                 onClick={handleGoogleLogin}
-                className="w-full h-14 font-black text-lg shadow-lg shadow-primary/20"
+                className="w-full h-14 font-black text-lg shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
                 disabled={isGoogleLoading}
               >
                 {isGoogleLoading ? (
@@ -199,7 +184,7 @@ export default function AdminLogin() {
                 {isGoogleLoading ? "Connecting..." : "Login with NEU Google"}
               </Button>
               <p className="text-[10px] text-center text-muted-foreground uppercase tracking-widest font-bold">
-                Use your @neu.edu.ph account
+                Use your @neu.edu.ph institutional account
               </p>
             </TabsContent>
 
@@ -213,7 +198,7 @@ export default function AdminLogin() {
                       id="email" 
                       type="email" 
                       placeholder="name@neu.edu.ph" 
-                      className="pl-10 h-12"
+                      className="pl-10 h-12 bg-secondary/30"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -228,7 +213,7 @@ export default function AdminLogin() {
                       id="password" 
                       type="password" 
                       placeholder="••••••••" 
-                      className="pl-10 h-12"
+                      className="pl-10 h-12 bg-secondary/30"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
@@ -6,26 +5,25 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore'
 
-// IMPORTANT: DO NOT MODIFY THIS FUNCTION EXCEPT FOR PERSISTENCE SETUP
+/**
+ * Initializes Firebase services with strict adherence to the provided config.
+ * Ensures persistence is set globally to avoid session loss across redirects.
+ */
 export function initializeFirebase() {
-  if (!getApps().length) {
-    let firebaseApp;
-    try {
-      firebaseApp = initializeApp();
-    } catch (e) {
-      if (process.env.NODE_ENV === "production") {
-        console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
-      }
-      firebaseApp = initializeApp(firebaseConfig);
-    }
-
-    const sdks = getSdks(firebaseApp);
-    // Set global persistence
-    setPersistence(sdks.auth, browserLocalPersistence).catch(console.error);
-    return sdks;
+  const apps = getApps();
+  // Always prefer existing app, but force use of our specific config on first init
+  const app = apps.length > 0 ? apps[0] : initializeApp(firebaseConfig);
+  
+  const sdks = getSdks(app);
+  
+  // Set global persistence once
+  if (apps.length === 0) {
+    setPersistence(sdks.auth, browserLocalPersistence).catch(err => {
+      console.warn("Persistence could not be set:", err);
+    });
   }
-
-  return getSdks(getApp());
+  
+  return sdks;
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {

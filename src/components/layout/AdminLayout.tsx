@@ -38,19 +38,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isAdmin = role === 'Admin' || role === 'Librarian';
 
   useEffect(() => {
-    // CRITICAL: Only redirect if loading is finished.
-    // We stay on the loading screen until we are 100% sure about the auth and profile status.
-    if (!isUserLoading) {
+    // Only redirect once loading is fully finished for both Auth and Firestore
+    if (!isUserLoading && !isProfileLoading) {
       if (!user) {
-        // Definitely not logged in at all
+        // Definitely not logged in
         router.replace('/admin/login');
-      } else if (!isProfileLoading) {
-        // Auth is confirmed, Profile loading is finished. 
-        // Now check if they are actually authorized.
-        if (!isAdmin) {
-          // Logged in user has no admin role
-          router.replace('/admin/login');
-        }
+      } else if (!isAdmin) {
+        // Logged in but not an admin
+        router.replace('/admin/login');
       }
     }
   }, [user, isUserLoading, isProfileLoading, isAdmin, router]);
@@ -66,18 +61,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   // Show a full-page loader while checking auth OR profile
-  // This prevents the flickering loop by keeping the user on a neutral "waiting" state
   if (isUserLoading || (user && isProfileLoading)) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-        <h2 className="text-xl font-bold">Verifying Permissions</h2>
-        <p className="text-muted-foreground mt-2">Connecting to NEU Library Secure Portal...</p>
+        <h2 className="text-xl font-bold font-headline">Verifying Permissions</h2>
+        <p className="text-muted-foreground mt-2 italic">Connecting to NEU Library Secure Portal...</p>
       </div>
     );
   }
 
-  // Final safety check: if we aren't loading but also aren't authorized, don't show the dashboard
+  // Safety check
   if (!user || !isAdmin) {
     return null;
   }
@@ -93,7 +87,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 bottom-0 w-64 border-r bg-card flex flex-col p-6 z-40">
         <div className="flex items-center gap-3 mb-10">
-          <div className="relative w-10 h-10 overflow-hidden rounded-full p-1 bg-white">
+          <div className="relative w-10 h-10 overflow-hidden rounded-full p-1 bg-white border border-primary/20">
             {logo && (
               <Image 
                 src={logo.imageUrl} 
@@ -104,7 +98,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               />
             )}
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-primary">NEU Library</h1>
+          <h1 className="text-xl font-bold tracking-tight text-primary font-headline">NEU Library</h1>
         </div>
 
         <nav className="flex-1 space-y-2">
@@ -116,7 +110,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 key={item.href} 
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group",
+                  "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",
                   active 
                     ? "bg-primary text-primary-foreground font-semibold shadow-md shadow-primary/20" 
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -129,15 +123,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           })}
         </nav>
 
-        <div className="pt-6 border-t space-y-4">
+        <div className="pt-6 border-t space-y-4 border-muted/20">
           <div className="px-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-1">Signed in as</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-1">Signed in as</p>
             <p className="text-sm font-bold truncate text-primary">{userProfile?.fullName || user.displayName || user.email}</p>
-            <p className="text-[10px] text-muted-foreground uppercase font-black">{role || 'Authorized'}</p>
+            <Badge variant="outline" className="mt-2 text-[8px] h-4 uppercase border-accent text-accent">
+              {role || 'Authorized'}
+            </Badge>
           </div>
           <Button 
             variant="ghost" 
-            className="w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive font-bold"
+            className="w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive font-bold rounded-xl"
             onClick={handleLogout}
           >
             <LogOut className="mr-3 w-5 h-5" />
