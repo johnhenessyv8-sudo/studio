@@ -55,6 +55,7 @@ export default function Dashboard() {
     const colleges: Record<string, number> = {};
 
     visits.forEach(v => {
+      // Handle both Firestore Timestamps and regular Date objects
       const entryTime = v.entryTime?.toDate ? v.entryTime.toDate() : new Date(v.entryTime);
       
       if (entryTime >= todayStart) todayCount++;
@@ -63,6 +64,7 @@ export default function Dashboard() {
 
       purposes[v.purpose] = (purposes[v.purpose] || 0) + 1;
 
+      // Find user to get college
       const user = users?.find(u => u.institutionalEmail === v.visitorEmail);
       const college = user?.college || 'Others';
       colleges[college] = (colleges[college] || 0) + 1;

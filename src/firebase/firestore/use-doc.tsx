@@ -33,9 +33,11 @@ export function useDoc<T = any>(
   type StateDataType = WithId<T> | null;
 
   const [data, setData] = useState<StateDataType>(null);
+  // Default to true if we have a ref to fetch, false if we don't.
   const [isLoading, setIsLoading] = useState<boolean>(!!memoizedDocRef);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
+  // Use a ref to track if we've initialized for the current memoizedDocRef
   const lastRefPath = useRef<string | null>(null);
 
   useEffect(() => {
@@ -49,6 +51,7 @@ export function useDoc<T = any>(
       return;
     }
 
+    // If the path changed, we are now loading again
     if (currentPath !== lastRefPath.current) {
       setIsLoading(true);
       lastRefPath.current = currentPath;
@@ -74,6 +77,7 @@ export function useDoc<T = any>(
         setError(contextualError);
         setData(null);
         setIsLoading(false);
+        // Do not use console.error, error is handled by the global error listener
         errorEmitter.emit('permission-error', contextualError);
       }
     );

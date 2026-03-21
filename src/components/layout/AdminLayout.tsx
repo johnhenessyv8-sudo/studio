@@ -32,8 +32,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     async function verifyAccess() {
+      // Don't act while user session is still being checked
       if (isUserLoading) return;
       
+      // If no user, send to login
       if (!user) {
         router.replace('/admin/login');
         return;
@@ -42,29 +44,41 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (!firestore) return;
 
       try {
-        // 1. Try UID lookup
+        // Step 1: Look up profile by UID
         const userDocRef = doc(firestore, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
         
         if (userSnap.exists()) {
-          setProfile(userSnap.data());
-          setIsVerifying(false);
+          const profileData = userSnap.data();
+          const isAdmin = profileData.role === 'Admin' || profileData.role === 'Librarian';
+          
+          if (isAdmin) {
+            setProfile(profileData);
+            setIsVerifying(false);
+          } else {
+            router.replace('/admin/login');
+          }
         } else if (user.email) {
-          // 2. Fallback: Search by email
+          // Step 2: Fallback search by email (for manually added profiles)
           const q = query(collection(firestore, 'users'), where('institutionalEmail', '==', user.email));
           const querySnap = await getDocs(q);
           
           if (!querySnap.empty) {
             const foundDoc = querySnap.docs[0];
             const data = foundDoc.data();
-            setProfile(data);
+            const isAdmin = data.role === 'Admin' || data.role === 'Librarian';
             
-            // Link UID to this profile
-            await updateDoc(doc(firestore, 'users', foundDoc.id), {
-              id: user.uid,
-              updatedAt: serverTimestamp()
-            });
-            setIsVerifying(false);
+            if (isAdmin) {
+              setProfile(data);
+              // Link UID to this profile for future instant lookups
+              await updateDoc(doc(firestore, 'users', foundDoc.id), {
+                id: user.uid,
+                updatedAt: serverTimestamp()
+              });
+              setIsVerifying(false);
+            } else {
+              router.replace('/admin/login');
+            }
           } else {
             router.replace('/admin/login');
           }

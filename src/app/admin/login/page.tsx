@@ -39,18 +39,20 @@ export default function AdminLogin() {
       
       setIsVerifying(true);
       try {
+        // Try looking up profile by UID
         const userDocRef = doc(firestore, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
         
         let profile = userSnap.exists() ? userSnap.data() : null;
 
-        // Fallback: Link by institutional email if manually added
+        // Fallback: Search for profile by institutional email if UID lookup failed
         if (!profile && user.email) {
           const q = query(collection(firestore, 'users'), where('institutionalEmail', '==', user.email));
           const querySnap = await getDocs(q);
           if (!querySnap.empty) {
             const foundDoc = querySnap.docs[0];
             profile = foundDoc.data();
+            // Automatically link the UID to this profile
             await updateDoc(doc(firestore, 'users', foundDoc.id), {
               id: user.uid,
               updatedAt: serverTimestamp()
@@ -66,7 +68,7 @@ export default function AdminLogin() {
             setAuthError(`Access Denied: Your profile role is "${profile.role}". Administrative access required.`);
           }
         } else {
-          setAuthError(`Profile not found for ${user.email}. UID: ${user.uid}. Please contact the system admin.`);
+          setAuthError(`Profile not found for ${user.email}. Please ensure your account has been pre-registered by a system admin.`);
         }
       } catch (err: any) {
         setAuthError(err.message);
@@ -85,15 +87,20 @@ export default function AdminLogin() {
     setIsGoogleLoading(true);
     setAuthError(null);
     const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account', hd: 'neu.edu.ph' });
+    provider.setCustomParameters({ 
+      prompt: 'select_account',
+      hd: 'neu.edu.ph' // Enforce NEU domain if possible
+    });
 
     try {
       await signInWithPopup(auth, provider);
     } catch (error: any) {
       console.error("Auth error:", error);
-      if (error.code === 'auth/invalid-credential') {
-        setAuthError("Auth Error: Invalid Credential. This often happens if the domain is not authorized in the Google Cloud Console.");
-      } else if (error.code !== 'auth/popup-closed-by-user') {
+      if (error.code === 'auth/popup-closed-by-user') {
+        // Silently handle popup closed
+      } else if (error.code === 'auth/invalid-credential') {
+        setAuthError("Auth Error: Invalid Credential. Ensure Port 6000 is authorized in Firebase Console.");
+      } else {
         setAuthError(error.message);
       }
       setIsGoogleLoading(false);
@@ -109,7 +116,7 @@ export default function AdminLogin() {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {
       if (error.code === 'auth/invalid-credential') {
-        setAuthError("Login failed. Please check your institutional email and password.");
+        setAuthError("Login failed. Check your institutional email and password.");
       } else {
         setAuthError(error.message);
       }
@@ -121,8 +128,8 @@ export default function AdminLogin() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-        <h2 className="text-xl font-bold font-headline">Synchronizing Portal</h2>
-        <p className="text-muted-foreground mt-2 italic">Verifying administrative access...</p>
+        <h2 className="text-xl font-bold font-headline">Verifying Portal</h2>
+        <p className="text-muted-foreground mt-2 italic">Checking administrative credentials...</p>
       </div>
     );
   }
@@ -215,19 +222,19 @@ export default function AdminLogin() {
           </Tabs>
         </div>
         
-        {/* Domain Diagnostics */}
+        {/* Domain Diagnostic Tool */}
         <div className="mt-8 p-6 bg-secondary/50 border rounded-2xl space-y-4">
           <div className="flex items-center gap-2 text-primary">
             <Info className="w-4 h-4" />
-            <h3 className="text-xs font-bold uppercase tracking-widest">Port 6000 Diagnostic</h3>
+            <h3 className="text-xs font-bold uppercase tracking-widest">Environment Diagnostic</h3>
           </div>
           <div className="space-y-2">
-            <p className="text-[10px] text-muted-foreground uppercase font-black">Current Domain:</p>
+            <p className="text-[10px] text-muted-foreground uppercase font-black">Current Origin:</p>
             <code className="block p-2 bg-background rounded text-[10px] break-all font-mono text-primary border border-primary/20">
               {currentOrigin}
             </code>
             <p className="text-[9px] text-muted-foreground leading-relaxed italic">
-              Ensure this domain is added to <strong>Authorized Domains</strong> in your Firebase Console (Authentication {'->'} Settings).
+              Verify this domain is in your Authorized Domains in the Firebase Console (Authentication {'>'} Settings).
             </p>
           </div>
           <Button variant="ghost" size="sm" className="w-full text-[10px] font-bold h-7 gap-2" asChild>
