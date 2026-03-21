@@ -75,16 +75,18 @@
           "type": "string",
           "description": "Unique identifier for the Visit entity."
         },
+        "visitorEmail": {
+          "type": "string",
+          "description": "The institutional email of the visitor.",
+          "format": "email"
+        },
         "visitorId": {
           "type": "string",
-          "description": "Reference to the User entity representing the individual who made this visit. (Relationship: User 1:N Visit)"
+          "description": "Optional reference to the User entity (UID) if the user was authenticated."
         },
         "purpose": {
           "type": "string",
-          "description": "The primary reason or activity for the user's visit to the library.",
-          "items": {
-            "type": "string"
-          }
+          "description": "The primary reason or activity for the user's visit to the library."
         },
         "entryTime": {
           "type": "string",
@@ -94,7 +96,7 @@
       },
       "required": [
         "id",
-        "visitorId",
+        "visitorEmail",
         "purpose",
         "entryTime"
       ]
@@ -131,7 +133,7 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "A collection where the existence of a document signifies 'admin' privileges for the associated userId. This leverages the 'Existence over Content' pattern for DBAC and Authorization Independence. Only existing admins can create or delete documents in this collection.",
+          "description": "A collection where the existence of a document signifies 'admin' privileges for the associated userId. Only existing admins can create or delete documents in this collection.",
           "params": [
             {
               "name": "userId",
@@ -147,7 +149,7 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "A collection where the existence of a document signifies 'librarian' privileges for the associated userId. This leverages the 'Existence over Content' pattern for DBAC and Authorization Independence. Only existing admins can create or delete documents in this collection.",
+          "description": "A collection where the existence of a document signifies 'librarian' privileges for the associated userId. Only existing admins can create or delete documents in this collection.",
           "params": [
             {
               "name": "userId",
@@ -163,7 +165,7 @@
           "schema": {
             "$ref": "#/backend/entities/Visit"
           },
-          "description": "Records individual library visits. Includes 'visitorId' which is denormalized from the user's UID to ensure Authorization Independence. Authenticated NEU users can create their own visit records, while administrators and librarians have full read access to all visit logs (supporting QAPs). Visit records are immutable after creation.",
+          "description": "Records individual library visits. Authenticated NEU staff can view logs, while any student with an NEU email can create a record.",
           "params": [
             {
               "name": "visitId",
