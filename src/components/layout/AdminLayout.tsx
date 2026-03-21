@@ -42,7 +42,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (!firestore) return;
 
       try {
-        // 1. Try fetching by exact UID
+        // Step 1: Look for exact UID match in Firestore document IDs
         const userDocRef = doc(firestore, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
         
@@ -51,7 +51,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (userSnap.exists()) {
           profileData = userSnap.data();
         } else if (user.email) {
-          // 2. Fallback: Search by institutional email if UID isn't linked yet
+          // Step 2: Fallback to searching for the institutional email field
           const q = query(
             collection(firestore, 'users'), 
             where('institutionalEmail', '==', user.email.toLowerCase())
@@ -62,7 +62,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             const foundDoc = querySnap.docs[0];
             profileData = foundDoc.data();
             
-            // Link UID to this profile automatically
+            // Auto-link: Update the document to use the current UID for faster future lookups
             await updateDoc(foundDoc.ref, {
               id: user.uid,
               updatedAt: serverTimestamp()
@@ -82,7 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           router.replace('/admin/login');
         }
       } catch (error) {
-        console.error("Access verification error:", error);
+        console.error("Layout verification failure:", error);
         router.replace('/admin/login');
       }
     }
@@ -104,8 +104,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-        <h2 className="text-xl font-bold font-headline">Verifying Profile...</h2>
-        <p className="text-muted-foreground mt-2 italic">Checking administrative credentials</p>
+        <h2 className="text-xl font-bold font-headline">Verifying Portal Access...</h2>
+        <p className="text-muted-foreground mt-2 italic">Checking credentials</p>
       </div>
     );
   }

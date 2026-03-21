@@ -63,7 +63,14 @@ export default function Dashboard() {
     const colleges: Record<string, number> = {};
 
     visits.forEach(v => {
-      const entryTime = v.entryTime?.toDate ? v.entryTime.toDate() : new Date(v.entryTime);
+      let entryTime: Date;
+      if (v.entryTime?.toDate) {
+        entryTime = v.entryTime.toDate();
+      } else if (v.entryTime instanceof Date) {
+        entryTime = v.entryTime;
+      } else {
+        entryTime = new Date(v.entryTime);
+      }
       
       if (entryTime >= todayStart) todayCount++;
       if (entryTime >= weekStart) weekCount++;

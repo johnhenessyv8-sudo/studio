@@ -39,12 +39,13 @@ export default function AdminLogin() {
       
       setIsVerifying(true);
       try {
-        // Search logic: try UID first, then email fallback
+        // Attempt 1: Fetch by UID directly
         const userDocRef = doc(firestore, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
         
         let profile = userSnap.exists() ? userSnap.data() : null;
 
+        // Attempt 2: Fallback to email search if UID doesn't match a document ID
         if (!profile && user.email) {
           const q = query(
             collection(firestore, 'users'), 
@@ -54,7 +55,7 @@ export default function AdminLogin() {
           if (!querySnap.empty) {
             const foundDoc = querySnap.docs[0];
             profile = foundDoc.data();
-            // Link UID for future logins
+            // Automatically link the UID to this record for future one-step logins
             await updateDoc(foundDoc.ref, {
               id: user.uid,
               updatedAt: serverTimestamp()
@@ -67,10 +68,10 @@ export default function AdminLogin() {
           if (isAdmin) {
             router.replace('/admin/dashboard');
           } else {
-            setAuthError(`Access Denied: Your profile role is "${profile.role}". Administrative access required.`);
+            setAuthError(`Access Denied: Your profile role is "${profile.role}". Administrative privileges required.`);
           }
         } else {
-          setAuthError(`Profile not found for ${user.email}. Ensure your account is pre-registered in the library system.`);
+          setAuthError(`No library profile found for ${user.email}. Please ensure your account is pre-registered.`);
         }
       } catch (err: any) {
         setAuthError(err.message);
@@ -113,7 +114,7 @@ export default function AdminLogin() {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {
       if (error.code === 'auth/invalid-credential') {
-        setAuthError("Login failed. Check your institutional email and password.");
+        setAuthError("Authentication Failed: The email or password provided is incorrect.");
       } else {
         setAuthError(error.message);
       }
@@ -125,8 +126,8 @@ export default function AdminLogin() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-        <h2 className="text-xl font-bold font-headline">Verifying Portal</h2>
-        <p className="text-muted-foreground mt-2 italic">Checking administrative credentials...</p>
+        <h2 className="text-xl font-bold font-headline">Authenticating...</h2>
+        <p className="text-muted-foreground mt-2 italic">Verifying your portal access</p>
       </div>
     );
   }
@@ -153,7 +154,7 @@ export default function AdminLogin() {
           {authError && (
             <Alert variant="destructive" className="mb-6 bg-destructive/10 border-destructive/20 text-destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle className="font-bold">Authorization Failed</AlertTitle>
+              <AlertTitle className="font-bold">Access Error</AlertTitle>
               <AlertDescription className="text-xs mt-1">
                 {authError}
               </AlertDescription>
@@ -177,7 +178,7 @@ export default function AdminLogin() {
                 ) : (
                   <Chrome className="mr-2 w-6 h-6" />
                 )}
-                {isGoogleLoading ? "Connecting..." : "NEU Google Login"}
+                {isGoogleLoading ? "Connecting..." : "Google Login"}
               </Button>
             </TabsContent>
 
@@ -225,12 +226,12 @@ export default function AdminLogin() {
             <h3 className="text-xs font-bold uppercase tracking-widest">Environment Diagnostic</h3>
           </div>
           <div className="space-y-2">
-            <p className="text-[10px] text-muted-foreground uppercase font-black">Current Origin:</p>
+            <p className="text-[10px] text-muted-foreground uppercase font-black">Current Domain Origin:</p>
             <code className="block p-2 bg-background rounded text-[10px] break-all font-mono text-primary border border-primary/20">
               {currentOrigin}
             </code>
             <p className="text-[9px] text-muted-foreground leading-relaxed italic">
-              Ensure this domain is added to <strong>Authorized Domains</strong> in your Firebase Console (Authentication &gt; Settings).
+              Verify this domain is in your <strong>Authorized Domains</strong> in the Firebase Console (Authentication &gt; Settings).
             </p>
           </div>
           <Button variant="ghost" size="sm" className="w-full text-[10px] font-bold h-7 gap-2" asChild>
