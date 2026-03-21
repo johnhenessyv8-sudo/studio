@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { 
   Search, 
@@ -10,7 +10,10 @@ import {
   ChevronDown,
   User,
   GraduationCap,
-  IdCard
+  IdCard,
+  MoreVertical,
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -22,19 +25,45 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, orderBy, limit } from 'firebase/firestore';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useFirestore, useCollection, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { collection, query, orderBy, limit, doc, deleteDoc } from 'firebase/firestore';
 import { format, isToday, isWithinInterval, subDays, startOfDay } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 export default function VisitorLogPage() {
   const { user } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
+  
+  // UI State
   const [searchTerm, setSearchTerm] = useState('');
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [logToDelete, setLogToDelete] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Filtering State
   const [filterPurpose, setFilterPurpose] = useState<string>('all');
   const [filterDate, setFilterDate] = useState<string>('all');
   const [filterCollege, setFilterCollege] = useState<string>('all');
+
+  /**
+   * SAFETY FIX: Prevents the UI from freezing after a modal action.
+   */
+  useEffect(() => {
+    if (!isDeleteOpen) {
+      document.body.style.pointerEvents = 'auto';
+    }
+  }, [isDeleteOpen]);
 
   // Fetch Visits
   const visitsQuery = useMemoFirebase(() => {
@@ -70,7 +99,7 @@ export default function VisitorLogPage() {
       visit.visitorEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       visit.purpose?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       visit.college?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (visit as any).idNumber?.toLowerCase().includes(searchTerm.toLowerCase())
+      visit.idNumber?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     if (filterPurpose !== 'all') {
@@ -99,13 +128,38 @@ export default function VisitorLogPage() {
     return result;
   }, [enrichedVisits, searchTerm, filterPurpose, filterDate, filterCollege]);
 
+  const handleDeleteLog = async () => {
+    if (!firestore || !logToDelete || isDeleting) return;
+
+    setIsDeleting(true);
+    try {
+      const logRef = doc(firestore, 'visits', logToDelete.id);
+      await deleteDoc(logRef);
+      
+      toast({
+        title: "Record Deleted",
+        description: "Library visit record has been removed."
+      });
+      setIsDeleteOpen(false);
+      setLogToDelete(null);
+    } catch (error: any) {
+      const permissionError = new FirestorePermissionError({
+        path: `visits/${logToDelete.id}`,
+        operation: 'delete',
+      });
+      errorEmitter.emit('permission-error', permissionError);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const exportToCSV = () => {
     if (!filteredVisits || filteredVisits.length === 0) return;
     
     const headers = ["Visitor Email", "ID Number", "College", "Purpose", "Entry Time", "Status"];
     const rows = filteredVisits.map(v => [
       v.visitorEmail,
-      (v as any).idNumber,
+      v.idNumber,
       v.college,
       v.purpose,
       v.entryTime?.toDate ? format(v.entryTime.toDate(), 'PPP p') : 'Pending',
@@ -214,7 +268,7 @@ export default function VisitorLogPage() {
                 <TableHead className="font-bold">College</TableHead>
                 <TableHead className="font-bold">Purpose</TableHead>
                 <TableHead className="font-bold">Entry Date & Time</TableHead>
-                <TableHead className="font-bold text-right px-6">Status</TableHead>
+                <TableHead className="font-bold text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -263,8 +317,22 @@ export default function VisitorLogPage() {
                     <TableCell className="text-muted-foreground text-xs font-medium">
                       {visit.entryTime?.toDate ? format(visit.entryTime.toDate(), 'PPP p') : 'Processing...'}
                     </TableCell>
-                    <TableCell className="text-right px-6">
-                      <Badge className="bg-green-500/10 text-green-500 border-none font-bold">Checked In</Badge>
+                    <TableCell className="text-center">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem 
+                            className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                            onSelect={(e) => { e.preventDefault(); setLogToDelete(visit); setIsDeleteOpen(true); }}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" /> Delete Record
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))
@@ -273,6 +341,29 @@ export default function VisitorLogPage() {
           </Table>
         </div>
       </div>
+
+      {/* Delete Confirmation Alert */}
+      <AlertDialog open={isDeleteOpen} onOpenChange={(open) => { setIsDeleteOpen(open); if (!open) setLogToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Visit Record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the visit log for <b>{logToDelete?.visitorEmail}</b> from the system. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <Button 
+              onClick={handleDeleteLog} 
+              variant="destructive"
+              disabled={isDeleting}
+            >
+              {isDeleting ? <Loader2 className="animate-spin mr-2" /> : <Trash2 className="mr-2 w-4 h-4" />}
+              {isDeleting ? "Deleting..." : "Permanently Delete"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AdminLayout>
   );
 }
