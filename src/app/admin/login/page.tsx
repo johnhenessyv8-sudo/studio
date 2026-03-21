@@ -39,11 +39,13 @@ export default function AdminLogin() {
       
       setIsVerifying(true);
       try {
+        // Try direct lookup by UID
         const userDocRef = doc(firestore, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
         
         let profile = userSnap.exists() ? userSnap.data() : null;
 
+        // Fallback: lookup by email to link session
         if (!profile && user.email) {
           const q = query(
             collection(firestore, 'users'), 
@@ -53,6 +55,7 @@ export default function AdminLogin() {
           if (!querySnap.empty) {
             const foundDoc = querySnap.docs[0];
             profile = foundDoc.data();
+            // Link the profile to this session's UID
             await updateDoc(foundDoc.ref, {
               id: user.uid,
               updatedAt: serverTimestamp()
@@ -95,6 +98,7 @@ export default function AdminLogin() {
     try {
       await signInWithPopup(auth, provider);
     } catch (error: any) {
+      // Ignore user-cancelled login
       if (error.code !== 'auth/popup-closed-by-user') {
         setAuthError(error.message);
       }

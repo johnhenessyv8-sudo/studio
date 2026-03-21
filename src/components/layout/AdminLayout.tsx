@@ -32,6 +32,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     async function verifyAccess() {
+      // Strict wait for auth resolution
       if (isUserLoading) return;
       
       if (!user) {
@@ -42,7 +43,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (!firestore) return;
 
       try {
-        // Find profile by current UID or email fallback
+        // Try direct lookup by UID
         const userDocRef = doc(firestore, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
         
@@ -51,7 +52,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (userSnap.exists()) {
           profileData = userSnap.data();
         } else if (user.email) {
-          // Fallback to searching by institutional email to handle provider switching
+          // Fallback: lookup by email to link session
           const q = query(
             collection(firestore, 'users'), 
             where('institutionalEmail', '==', user.email.toLowerCase())
