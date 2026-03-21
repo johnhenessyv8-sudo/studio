@@ -5,12 +5,11 @@ import React, { useMemo } from 'react';
 import Link from 'next/link';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { 
   Users, 
   Calendar, 
   Clock, 
-  TrendingUp, 
-  Search, 
   FileDown,
   Loader2 
 } from 'lucide-react';
@@ -29,7 +28,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, limit } from 'firebase/firestore';
+import { collection } from 'firebase/firestore';
 import { format, startOfWeek, startOfMonth } from 'date-fns';
 
 export default function Dashboard() {
@@ -77,7 +76,6 @@ export default function Dashboard() {
       color: ['#DEB731', '#ED7D58', '#72b0ab', '#fe9179', '#bcdddc'][idx % 5] 
     }));
 
-    // Sort by time descending for "recent"
     const sortedVisits = [...visits].sort((a, b) => {
       const tA = a.entryTime?.toDate ? a.entryTime.toDate().getTime() : 0;
       const tB = b.entryTime?.toDate ? b.entryTime.toDate().getTime() : 0;
@@ -117,7 +115,6 @@ export default function Dashboard() {
           </Button>
         </div>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="bg-gradient-to-br from-primary/10 to-card border-primary/20 shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -153,7 +150,6 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="shadow-lg border-muted/20">
             <CardHeader>
@@ -226,7 +222,6 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Recent Logs */}
         <Card className="shadow-xl border-muted/20 overflow-hidden">
           <CardHeader className="bg-secondary/20 flex flex-row items-center justify-between py-4">
             <CardTitle className="text-lg font-bold font-headline">Latest Entries</CardTitle>

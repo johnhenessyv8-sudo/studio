@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -9,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { ArrowLeft, ShieldCheck, Chrome, Loader2, AlertCircle, Info } from 'lucide-react';
 import { useAuth, useUser, useFirestore } from '@/firebase';
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -32,21 +33,17 @@ export default function AdminLogin() {
       
       setIsVerifying(true);
       try {
-        // 1. Try direct UID lookup
         const userDocRef = doc(firestore, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
         
         let profile = userSnap.exists() ? userSnap.data() : null;
 
-        // 2. Fallback: Search by email if UID lookup fails
-        // This handles users added manually by the Librarian via email
         if (!profile && user.email) {
           const q = query(collection(firestore, 'users'), where('institutionalEmail', '==', user.email));
           const querySnap = await getDocs(q);
           if (!querySnap.empty) {
             const foundDoc = querySnap.docs[0];
             profile = foundDoc.data();
-            // Link this UID to the existing profile for future fast lookup
             await updateDoc(doc(firestore, 'users', foundDoc.id), {
               id: user.uid,
               updatedAt: serverTimestamp()
@@ -164,9 +161,6 @@ export default function AdminLogin() {
                 )}
                 {isGoogleLoading ? "Connecting..." : "NEU Google Login"}
               </Button>
-              <p className="text-[10px] text-center text-muted-foreground px-4">
-                Recommended for @neu.edu.ph accounts.
-              </p>
             </TabsContent>
 
             <TabsContent value="email">
