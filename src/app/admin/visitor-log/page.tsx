@@ -58,7 +58,7 @@ export default function VisitorLogPage() {
       const userProfile = users?.find(u => u.institutionalEmail?.toLowerCase().trim() === visitorEmail);
       return {
         ...visit,
-        college: userProfile?.college || 'External/Unknown'
+        college: userProfile?.college || 'External/Unregistered'
       };
     });
   }, [visits, users]);
@@ -135,7 +135,7 @@ export default function VisitorLogPage() {
               {filteredVisits.length} Records Found
             </Badge>
             <Button onClick={exportToCSV} variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white font-bold">
-              <FileDown className="mr-2 w-4 h-4" /> Export to Excel
+              <FileDown className="mr-2 w-4 h-4" /> Export to CSV
             </Button>
           </div>
         </div>

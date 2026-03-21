@@ -84,7 +84,7 @@ export default function Dashboard() {
       // Robust lookup by email (case-insensitive)
       const visitorEmail = v.visitorEmail?.toLowerCase().trim();
       const userProfile = users?.find(u => u.institutionalEmail?.toLowerCase().trim() === visitorEmail);
-      const college = userProfile?.college || 'External/Unknown';
+      const college = userProfile?.college || 'External/Unregistered';
       colleges[college] = (colleges[college] || 0) + 1;
     });
 

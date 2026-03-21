@@ -118,15 +118,23 @@ export default function AccountManagement() {
         updatedAt: serverTimestamp()
       };
 
-      await setDoc(userRef, data);
-
-      toast({
-        title: "User Created",
-        description: `${formData.fullName} added. Default password: mypassword123`
-      });
-      
-      setIsAddOpen(false);
-      setFormData({ fullName: '', email: '', idNumber: '', college: '', role: 'Student' });
+      setDoc(userRef, data)
+        .then(() => {
+          toast({
+            title: "User Created",
+            description: `${formData.fullName} added successfully.`
+          });
+          setIsAddOpen(false);
+          setFormData({ fullName: '', email: '', idNumber: '', college: '', role: 'Student' });
+        })
+        .catch(async () => {
+          const permissionError = new FirestorePermissionError({
+            path: userRef.path,
+            operation: 'create',
+            requestResourceData: data,
+          });
+          errorEmitter.emit('permission-error', permissionError);
+        });
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -138,7 +146,7 @@ export default function AccountManagement() {
     }
   };
 
-  const handleUpdateUser = async (e: React.FormEvent) => {
+  const handleUpdateUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (!firestore || !editingUser || isSaving) return;
 
@@ -152,23 +160,25 @@ export default function AccountManagement() {
       updatedAt: serverTimestamp()
     };
 
-    try {
-      await updateDoc(userRef, updatedData);
-      toast({
-        title: "Profile Updated",
-        description: "User details have been saved successfully."
+    updateDoc(userRef, updatedData)
+      .then(() => {
+        toast({
+          title: "Profile Updated",
+          description: "User details have been saved successfully."
+        });
+      })
+      .catch(async () => {
+        const permissionError = new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'update',
+          requestResourceData: updatedData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => {
+        setIsSaving(false);
+        setIsEditOpen(false);
       });
-      setIsEditOpen(false);
-    } catch (error: any) {
-      const permissionError = new FirestorePermissionError({
-        path: userRef.path,
-        operation: 'update',
-        requestResourceData: updatedData,
-      });
-      errorEmitter.emit('permission-error', permissionError);
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   const handleResetPassword = async (email: string) => {
