@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
@@ -14,8 +15,8 @@ import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { useUser, useFirestore, useDoc, useMemoFirebase, useAuth } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useUser, useFirestore, useAuth } from '@/firebase';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { Badge } from '@/components/ui/badge';
 
@@ -25,28 +26,60 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const [profile, setProfile] = useState<any>(null);
+  const [isVerifying, setIsVerifying] = useState(true);
+  
   const logo = PlaceHolderImages.find(img => img.id === 'neu-logo');
 
-  const userDocRef = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [firestore, user]);
-
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
-
-  // Robust check: We are syncing if auth is checking OR if a user exists but we don't have their profile yet.
-  const isSyncing = isUserLoading || (!!user && isProfileLoading);
-  
-  const role = userProfile?.role;
-  const isAdmin = role === 'Admin' || role === 'Librarian';
-
   useEffect(() => {
-    if (!isSyncing) {
-      if (!user || !isAdmin) {
+    async function verifyAccess() {
+      if (isUserLoading) return;
+      
+      if (!user) {
+        router.replace('/admin/login');
+        return;
+      }
+
+      if (!firestore) return;
+
+      try {
+        // 1. Try UID lookup
+        const userDocRef = doc(firestore, 'users', user.uid);
+        const userSnap = await getDoc(userDocRef);
+        
+        if (userSnap.exists()) {
+          setProfile(userSnap.data());
+          setIsVerifying(false);
+        } else if (user.email) {
+          // 2. Fallback: Search by email
+          const q = query(collection(firestore, 'users'), where('institutionalEmail', '==', user.email));
+          const querySnap = await getDocs(q);
+          
+          if (!querySnap.empty) {
+            const foundDoc = querySnap.docs[0];
+            const data = foundDoc.data();
+            setProfile(data);
+            
+            // Link UID to this profile
+            await updateDoc(doc(firestore, 'users', foundDoc.id), {
+              id: user.uid,
+              updatedAt: serverTimestamp()
+            });
+            setIsVerifying(false);
+          } else {
+            router.replace('/admin/login');
+          }
+        } else {
+          router.replace('/admin/login');
+        }
+      } catch (error) {
+        console.error("Access verification error:", error);
         router.replace('/admin/login');
       }
     }
-  }, [user, isSyncing, isAdmin, router]);
+
+    verifyAccess();
+  }, [user, isUserLoading, firestore, router]);
 
   const handleLogout = async () => {
     if (!auth) return;
@@ -57,6 +90,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       console.error("Logout failed:", error);
     }
   };
+
+  const isSyncing = isUserLoading || isVerifying;
+  const isAdmin = profile?.role === 'Admin' || profile?.role === 'Librarian';
 
   if (isSyncing) {
     return (
@@ -121,9 +157,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="pt-6 border-t space-y-4 border-muted/20">
           <div className="px-4">
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-1">Signed in as</p>
-            <p className="text-sm font-bold truncate text-primary">{userProfile?.fullName || user.displayName || user.email}</p>
+            <p className="text-sm font-bold truncate text-primary">{profile?.fullName || user.email}</p>
             <Badge variant="outline" className="mt-2 text-[8px] h-4 uppercase border-accent text-accent">
-              {role}
+              {profile?.role}
             </Badge>
           </div>
           <Button 

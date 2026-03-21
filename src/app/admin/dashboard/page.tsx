@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo } from 'react';
@@ -25,28 +26,23 @@ import {
   Tooltip, 
   Legend 
 } from 'recharts';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, limit, where } from 'firebase/firestore';
-import { format, isToday, startOfWeek, startOfMonth } from 'date-fns';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
+import { format, startOfWeek, startOfMonth } from 'date-fns';
 
 export default function Dashboard() {
   const firestore = useFirestore();
 
-  // Fetch all recent visits for analytics
   const visitsRef = useMemoFirebase(() => collection(firestore!, 'visits'), [firestore]);
   const { data: visits, isLoading: isVisitsLoading } = useCollection(visitsRef);
 
-  // Fetch users for reference if needed
   const usersRef = useMemoFirebase(() => collection(firestore!, 'users'), [firestore]);
   const { data: users } = useCollection(usersRef);
 
-  // Compute Statistics
   const stats = useMemo(() => {
-    if (!visits) return { today: 0, week: 0, month: 0, purposeBreakdown: [], collegeBreakdown: [] };
+    if (!visits) return { today: 0, week: 0, month: 0, purposeData: [], collegeData: [], recent: [] };
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -67,13 +63,10 @@ export default function Dashboard() {
       if (entryTime >= weekStart) weekCount++;
       if (entryTime >= monthStart) monthCount++;
 
-      // Aggregate purposes
       purposes[v.purpose] = (purposes[v.purpose] || 0) + 1;
 
-      // Aggregating colleges (via email or direct field if available)
-      // For this prototype, we'll try to find the user in our local users cache
       const user = users?.find(u => u.institutionalEmail === v.visitorEmail);
-      const college = user?.college || 'Unknown';
+      const college = user?.college || 'Others';
       colleges[college] = (colleges[college] || 0) + 1;
     });
 
@@ -84,13 +77,20 @@ export default function Dashboard() {
       color: ['#DEB731', '#ED7D58', '#72b0ab', '#fe9179', '#bcdddc'][idx % 5] 
     }));
 
+    // Sort by time descending for "recent"
+    const sortedVisits = [...visits].sort((a, b) => {
+      const tA = a.entryTime?.toDate ? a.entryTime.toDate().getTime() : 0;
+      const tB = b.entryTime?.toDate ? b.entryTime.toDate().getTime() : 0;
+      return tB - tA;
+    });
+
     return {
       today: todayCount,
       week: weekCount,
       month: monthCount,
       purposeData,
       collegeData,
-      recent: visits.slice(0, 5)
+      recent: sortedVisits.slice(0, 5)
     };
   }, [visits, users]);
 
@@ -106,61 +106,61 @@ export default function Dashboard() {
 
   return (
     <AdminLayout>
-      <div className="space-y-8">
+      <div className="space-y-8 animate-in fade-in duration-500">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-black tracking-tight text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground">Real-time statistics of library visits.</p>
+            <h1 className="text-4xl font-black tracking-tight text-foreground font-headline">Library Dashboard</h1>
+            <p className="text-muted-foreground italic">New Era University Real-time Analytics</p>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white">
-              <FileDown className="mr-2 w-4 h-4" /> Export Report
-            </Button>
-          </div>
+          <Button variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white font-bold h-11">
+            <FileDown className="mr-2 w-4 h-4" /> Export Report
+          </Button>
         </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="bg-gradient-to-br from-primary/20 to-card border-primary/20">
+          <Card className="bg-gradient-to-br from-primary/10 to-card border-primary/20 shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Today</CardTitle>
+              <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Today's Footfall</CardTitle>
               <Users className="w-5 h-5 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-black">{stats.today}</div>
-              <p className="text-xs text-muted-foreground mt-1">Visitors since midnight</p>
+              <div className="text-5xl font-black">{stats.today}</div>
+              <p className="text-[10px] text-muted-foreground mt-2 uppercase font-bold">Visitors since midnight</p>
             </CardContent>
           </Card>
-          <Card>
+          
+          <Card className="border-accent/20 shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">This Week</CardTitle>
+              <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Weekly Total</CardTitle>
               <Calendar className="w-5 h-5 text-accent" />
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-black">{stats.week}</div>
-              <p className="text-xs text-muted-foreground mt-1">Visitors this week</p>
+              <div className="text-5xl font-black">{stats.week}</div>
+              <p className="text-[10px] text-muted-foreground mt-2 uppercase font-bold">Active this week</p>
             </CardContent>
           </Card>
-          <Card>
+
+          <Card className="border-blue-500/20 shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">This Month</CardTitle>
+              <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Monthly Archive</CardTitle>
               <Clock className="w-5 h-5 text-blue-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-black">{stats.month}</div>
-              <p className="text-xs text-muted-foreground mt-1">Total monthly visits</p>
+              <div className="text-5xl font-black">{stats.month}</div>
+              <p className="text-[10px] text-muted-foreground mt-2 uppercase font-bold">Total monthly records</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
+          <Card className="shadow-lg border-muted/20">
             <CardHeader>
-              <CardTitle className="text-lg font-bold">Distribution by College</CardTitle>
+              <CardTitle className="text-lg font-bold font-headline">Traffic by College</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px] w-full">
+              <div className="h-[320px] w-full">
                 {stats.collegeData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -168,47 +168,48 @@ export default function Dashboard() {
                         data={stats.collegeData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={60}
+                        innerRadius={70}
                         outerRadius={100}
-                        paddingAngle={5}
+                        paddingAngle={8}
                         dataKey="value"
+                        stroke="none"
                       >
                         {stats.collegeData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
                       <Tooltip 
-                        contentStyle={{ backgroundColor: '#292518', border: '1px solid #DEB731', borderRadius: '8px' }}
+                        contentStyle={{ backgroundColor: '#1A1608', border: '1px solid #DEB731', borderRadius: '12px', fontSize: '12px' }}
                         itemStyle={{ color: '#fff' }}
                       />
-                      <Legend verticalAlign="bottom" height={36}/>
+                      <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold' }}/>
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-muted-foreground italic">
-                    No college data available yet.
+                  <div className="h-full flex items-center justify-center text-muted-foreground italic text-sm">
+                    Awaiting sufficient data...
                   </div>
                 )}
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="shadow-lg border-muted/20">
             <CardHeader>
-              <CardTitle className="text-lg font-bold">Purpose Breakdown</CardTitle>
+              <CardTitle className="text-lg font-bold font-headline">Purpose Breakdown</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px] w-full">
+              <div className="h-[320px] w-full">
                 {stats.purposeData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={stats.purposeData}>
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#888', fontSize: 10 }} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#888', fontSize: 10, fontWeight: 'bold' }} />
                       <YAxis hide />
                       <Tooltip 
-                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                        contentStyle={{ backgroundColor: '#292518', border: '1px solid #DEB731', borderRadius: '8px' }}
+                        cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                        contentStyle={{ backgroundColor: '#1A1608', border: '1px solid #DEB731', borderRadius: '12px' }}
                       />
-                      <Bar dataKey="count" radius={[10, 10, 0, 0]}>
+                      <Bar dataKey="count" radius={[12, 12, 0, 0]} barSize={40}>
                         {stats.purposeData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#DEB731' : '#ED7D58'} />
                         ))}
@@ -216,8 +217,8 @@ export default function Dashboard() {
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-muted-foreground italic">
-                    No purpose data available yet.
+                  <div className="h-full flex items-center justify-center text-muted-foreground italic text-sm">
+                    Awaiting sufficient data...
                   </div>
                 )}
               </div>
@@ -225,35 +226,35 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Recent Logs Table */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg font-bold">Latest Entries</CardTitle>
-            <Button variant="link" className="text-primary font-bold" asChild>
-              <Link href="/admin/visitor-log">Full Log</Link>
+        {/* Recent Logs */}
+        <Card className="shadow-xl border-muted/20 overflow-hidden">
+          <CardHeader className="bg-secondary/20 flex flex-row items-center justify-between py-4">
+            <CardTitle className="text-lg font-bold font-headline">Latest Entries</CardTitle>
+            <Button variant="link" className="text-primary font-bold text-xs" asChild>
+              <Link href="/admin/visitor-log">View All Records</Link>
             </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             <Table>
-              <TableHeader className="bg-secondary/50">
-                <TableRow>
-                  <TableHead className="font-bold">Visitor Email</TableHead>
-                  <TableHead className="font-bold">Entry Time</TableHead>
-                  <TableHead className="font-bold">Purpose</TableHead>
+              <TableHeader className="bg-secondary/40">
+                <TableRow className="border-none">
+                  <TableHead className="font-bold uppercase text-[10px] tracking-widest px-6">Visitor Email</TableHead>
+                  <TableHead className="font-bold uppercase text-[10px] tracking-widest">Entry Time</TableHead>
+                  <TableHead className="font-bold uppercase text-[10px] tracking-widest text-right px-6">Purpose</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {stats.recent?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">No visits recorded today.</TableCell>
+                    <TableCell colSpan={3} className="text-center py-10 text-muted-foreground italic">No visits recorded today.</TableCell>
                   </TableRow>
                 ) : (
                   stats.recent?.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell className="font-medium">{log.visitorEmail}</TableCell>
-                      <TableCell>{log.entryTime?.toDate ? format(log.entryTime.toDate(), 'p') : '...'}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="border-accent text-accent uppercase text-[10px]">{log.purpose}</Badge>
+                    <TableRow key={log.id} className="hover:bg-primary/5 transition-colors border-muted/10">
+                      <TableCell className="font-bold px-6">{log.visitorEmail}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">{log.entryTime?.toDate ? format(log.entryTime.toDate(), 'p') : '...'}</TableCell>
+                      <TableCell className="text-right px-6">
+                        <Badge variant="outline" className="border-accent/30 text-accent uppercase text-[9px] font-black">{log.purpose}</Badge>
                       </TableCell>
                     </TableRow>
                   ))

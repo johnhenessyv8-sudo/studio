@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -6,10 +7,10 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, ShieldCheck, Chrome, Loader2, AlertCircle } from 'lucide-react';
-import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { ArrowLeft, ShieldCheck, Chrome, Loader2, AlertCircle, Info } from 'lucide-react';
+import { useAuth, useUser, useFirestore } from '@/firebase';
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
-import { doc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -24,36 +25,63 @@ export default function AdminLogin() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-
-  const userDocRef = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [firestore, user]);
-
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
-    // Wait for auth AND profile to be ready before deciding to redirect
-    if (!isUserLoading && user && !isProfileLoading) {
-      const role = userProfile?.role;
-      const isAdmin = role === 'Admin' || role === 'Librarian';
+    async function checkAccess() {
+      if (!user || !firestore) return;
       
-      if (isAdmin) {
-        router.replace('/admin/dashboard');
-      } else if (userProfile) {
-        setAuthError(`Access Denied: Your account role is "${role}". Contact the lead librarian for authorization.`);
-      } else {
-        setAuthError(`Registration Required: No administrative profile found for your account.`);
+      setIsVerifying(true);
+      try {
+        // 1. Try direct UID lookup
+        const userDocRef = doc(firestore, 'users', user.uid);
+        const userSnap = await getDoc(userDocRef);
+        
+        let profile = userSnap.exists() ? userSnap.data() : null;
+
+        // 2. Fallback: Search by email if UID lookup fails
+        if (!profile && user.email) {
+          const q = query(collection(firestore, 'users'), where('institutionalEmail', '==', user.email));
+          const querySnap = await getDocs(q);
+          if (!querySnap.empty) {
+            const foundDoc = querySnap.docs[0];
+            profile = foundDoc.data();
+            // Link this UID to the existing profile for future fast lookup
+            await updateDoc(doc(firestore, 'users', foundDoc.id), {
+              id: user.uid,
+              updatedAt: serverTimestamp()
+            });
+          }
+        }
+
+        if (profile) {
+          const isAdmin = profile.role === 'Admin' || profile.role === 'Librarian';
+          if (isAdmin) {
+            router.replace('/admin/dashboard');
+          } else {
+            setAuthError(`Access Denied: Role "${profile.role}" is not authorized for Admin Portal.`);
+          }
+        } else {
+          setAuthError(`No administrative profile found for ${user.email}. Please contact the Lead Librarian.`);
+        }
+      } catch (err: any) {
+        setAuthError(err.message);
+      } finally {
+        setIsVerifying(false);
       }
     }
-  }, [user, isUserLoading, userProfile, isProfileLoading, router]);
+
+    if (!isUserLoading && user) {
+      checkAccess();
+    }
+  }, [user, isUserLoading, firestore, router]);
 
   const handleGoogleLogin = async () => {
     if (!auth) return;
     setIsGoogleLoading(true);
     setAuthError(null);
     const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
+    provider.setCustomParameters({ prompt: 'select_account', hd: 'neu.edu.ph' });
 
     try {
       await signInWithPopup(auth, provider);
@@ -61,7 +89,6 @@ export default function AdminLogin() {
       if (error.code !== 'auth/popup-closed-by-user') {
         setAuthError(error.message);
       }
-    } finally {
       setIsGoogleLoading(false);
     }
   };
@@ -79,11 +106,12 @@ export default function AdminLogin() {
     }
   };
 
-  if (isUserLoading || (user && isProfileLoading)) {
+  if (isUserLoading || isVerifying) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-        <h2 className="text-xl font-bold">Verifying Credentials</h2>
+        <h2 className="text-xl font-bold font-headline">Synchronizing Session</h2>
+        <p className="text-muted-foreground mt-2 italic">Verifying administrative credentials...</p>
       </div>
     );
   }
@@ -103,14 +131,14 @@ export default function AdminLogin() {
           </div>
 
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-black tracking-tight mb-2">Admin Portal</h1>
-            <p className="text-muted-foreground italic">New Era University Library</p>
+            <h1 className="text-3xl font-black tracking-tight mb-2 font-headline">Admin Portal</h1>
+            <p className="text-muted-foreground italic text-sm">New Era University Library</p>
           </div>
 
           {authError && (
             <Alert variant="destructive" className="mb-6 bg-destructive/10 border-destructive/20 text-destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle className="font-bold">Login Failed</AlertTitle>
+              <AlertTitle className="font-bold">Authorization Failed</AlertTitle>
               <AlertDescription className="text-xs mt-1">
                 {authError}
               </AlertDescription>
@@ -134,8 +162,11 @@ export default function AdminLogin() {
                 ) : (
                   <Chrome className="mr-2 w-6 h-6" />
                 )}
-                {isGoogleLoading ? "Connecting..." : "NEU Institutional Login"}
+                {isGoogleLoading ? "Connecting..." : "NEU Google Login"}
               </Button>
+              <p className="text-[10px] text-center text-muted-foreground px-4">
+                Recommended for @neu.edu.ph accounts.
+              </p>
             </TabsContent>
 
             <TabsContent value="email">
@@ -169,11 +200,18 @@ export default function AdminLogin() {
                   className="w-full h-12 font-bold text-lg"
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? "Logging in..." : "Login"}
+                  {isSubmitting ? <Loader2 className="animate-spin" /> : "Sign In"}
                 </Button>
               </form>
             </TabsContent>
           </Tabs>
+        </div>
+        
+        <div className="mt-8 p-4 bg-primary/5 border rounded-2xl flex gap-3 items-start">
+          <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+          <p className="text-[10px] leading-relaxed text-muted-foreground">
+            <strong>Librarians:</strong> If you are unable to login, ensure the Head Librarian has added your institutional email to the Account Management list.
+          </p>
         </div>
       </div>
     </div>
