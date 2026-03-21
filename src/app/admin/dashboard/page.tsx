@@ -81,9 +81,9 @@ export default function Dashboard() {
         purposes[v.purpose] = (purposes[v.purpose] || 0) + 1;
       }
 
-      // Robust lookup by email (case-insensitive)
+      // Case-insensitive lookup for visitor college
       const visitorEmail = v.visitorEmail?.toLowerCase().trim();
-      const userProfile = users?.find(u => u.institutionalEmail?.toLowerCase().trim() === visitorEmail);
+      const userProfile = users.find(u => u.institutionalEmail?.toLowerCase().trim() === visitorEmail);
       const college = userProfile?.college || 'External/Unregistered';
       colleges[college] = (colleges[college] || 0) + 1;
     });

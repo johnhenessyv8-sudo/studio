@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { 
   Search, 
@@ -17,8 +17,7 @@ import {
   MoreVertical,
   Edit2,
   FileDown,
-  Key,
-  AlertCircle
+  Key
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -86,6 +85,13 @@ export default function AccountManagement() {
     college: '',
     role: 'Student'
   });
+
+  // Safety fix for Radix UI freezing: ensure pointer events are re-enabled
+  useEffect(() => {
+    if (!isAddOpen && !isEditOpen && !isDeleteOpen) {
+      document.body.style.pointerEvents = 'auto';
+    }
+  }, [isAddOpen, isEditOpen, isDeleteOpen]);
 
   const usersRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -540,7 +546,7 @@ export default function AccountManagement() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={() => { setEditingUser(u); setIsEditOpen(true); }}>
+                            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setEditingUser(u); setIsEditOpen(true); }}>
                               <Edit2 className="w-4 h-4 mr-2 text-primary" /> Edit Profile
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleToggleActive(u)} disabled={isSaving}>
@@ -551,7 +557,7 @@ export default function AccountManagement() {
                               <Key className="w-4 h-4 mr-2 text-blue-500" /> Reset Password
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive focus:bg-destructive/10" onClick={() => { setUserToDelete(u); setIsDeleteOpen(true); }}>
+                            <DropdownMenuItem className="text-destructive focus:bg-destructive/10" onSelect={(e) => { e.preventDefault(); setUserToDelete(u); setIsDeleteOpen(true); }}>
                               <Trash2 className="w-4 h-4 mr-2" /> Delete Account
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -648,15 +654,15 @@ export default function AccountManagement() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
+              <AlertDialogCancel onClick={() => { setUserToDelete(null); setIsDeleteOpen(false); }}>Cancel</AlertDialogCancel>
+              <Button 
                 onClick={handleDeleteUser} 
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                variant="destructive"
                 disabled={isSaving}
               >
                 {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Trash2 className="mr-2 w-4 h-4" />}
                 Permanently Delete
-              </AlertDialogAction>
+              </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
