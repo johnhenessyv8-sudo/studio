@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, ShieldCheck, Chrome, Mail, Lock, Loader2 } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Chrome, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth, useUser, useFirestore } from '@/firebase';
 import { 
   GoogleAuthProvider, 
@@ -19,6 +19,7 @@ import {
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function AdminLogin() {
   const auth = useAuth();
@@ -31,11 +32,14 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
-  // Handle redirection after login state is determined
+  // Guarded redirect: Wait until auth state is fully determined
   useEffect(() => {
-    if (!isUserLoading && user) {
-      router.replace('/admin/dashboard');
+    if (!isUserLoading) {
+      if (user) {
+        router.replace('/admin/dashboard');
+      }
     }
   }, [user, isUserLoading, router]);
 
@@ -43,17 +47,15 @@ export default function AdminLogin() {
     if (!auth || !firestore) return;
     
     setIsGoogleLoading(true);
+    setAuthError(null);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
     try {
-      // Explicitly set persistence to local storage
       await setPersistence(auth, browserLocalPersistence);
-      
       const result = await signInWithPopup(auth, provider);
       const loggedUser = result.user;
 
-      // Ensure it's an NEU account
       if (loggedUser.email?.toLowerCase().endsWith('@neu.edu.ph')) {
         const userRef = doc(firestore, 'users', loggedUser.uid);
         await setDoc(userRef, {
@@ -68,9 +70,10 @@ export default function AdminLogin() {
           title: "Signed in successfully",
           description: `Welcome, ${loggedUser.displayName}!`
         });
+        // The useEffect will handle the redirect
       } else {
-        // If not NEU, sign them out immediately
         await auth.signOut();
+        setAuthError("Only @neu.edu.ph institutional accounts are allowed.");
         toast({
           variant: "destructive",
           title: "Access Restricted",
@@ -79,6 +82,7 @@ export default function AdminLogin() {
       }
     } catch (error: any) {
       if (error.code !== 'auth/popup-closed-by-user') {
+        setAuthError(error.message);
         toast({
           variant: "destructive",
           title: "Login failed",
@@ -94,14 +98,16 @@ export default function AdminLogin() {
     e.preventDefault();
     if (!auth) return;
     setIsSubmitting(true);
+    setAuthError(null);
     try {
       await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, email, password);
       toast({
         title: "Signed in",
-        description: "Welcome back to the portal."
+        description: "Welcome back."
       });
     } catch (error: any) {
+      setAuthError(error.message);
       toast({
         variant: "destructive",
         title: "Login failed",
@@ -116,7 +122,7 @@ export default function AdminLogin() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
         <Loader2 className="w-10 h-10 text-primary animate-spin" />
-        <p className="mt-4 text-muted-foreground font-medium">Preparing secure access...</p>
+        <p className="mt-4 text-muted-foreground font-bold tracking-tight">Restoring session...</p>
       </div>
     );
   }
@@ -142,6 +148,14 @@ export default function AdminLogin() {
             <h1 className="text-3xl font-black tracking-tight mb-2">Admin Portal</h1>
             <p className="text-muted-foreground">Login to access the dashboard.</p>
           </div>
+
+          {authError && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Authentication Error</AlertTitle>
+              <AlertDescription>{authError}</AlertDescription>
+            </Alert>
+          )}
 
           <Tabs defaultValue="google" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-8">
