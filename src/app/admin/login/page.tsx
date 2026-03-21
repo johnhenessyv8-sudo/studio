@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -40,6 +39,7 @@ export default function AdminLogin() {
         let profile = userSnap.exists() ? userSnap.data() : null;
 
         // 2. Fallback: Search by email if UID lookup fails
+        // This handles users added manually by the Librarian via email
         if (!profile && user.email) {
           const q = query(collection(firestore, 'users'), where('institutionalEmail', '==', user.email));
           const querySnap = await getDocs(q);
