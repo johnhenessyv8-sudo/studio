@@ -6,16 +6,11 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, ShieldCheck, Chrome, Mail, Lock, Loader2, AlertCircle, Copy, Check, Globe } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Chrome, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { 
-  GoogleAuthProvider, 
-  signInWithPopup, 
-  signInWithEmailAndPassword
-} from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function AdminLogin() {
@@ -23,21 +18,12 @@ export default function AdminLogin() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
-  const { toast } = useToast();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [currentOrigin, setCurrentOrigin] = useState('');
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setCurrentOrigin(window.location.origin);
-    }
-  }, []);
 
   const userDocRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -47,7 +33,7 @@ export default function AdminLogin() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
   useEffect(() => {
-    // Only redirect if everything is loaded and the role is confirmed.
+    // Wait for auth AND profile to be ready before deciding to redirect
     if (!isUserLoading && user && !isProfileLoading) {
       const role = userProfile?.role;
       const isAdmin = role === 'Admin' || role === 'Librarian';
@@ -55,36 +41,24 @@ export default function AdminLogin() {
       if (isAdmin) {
         router.replace('/admin/dashboard');
       } else if (userProfile) {
-        setAuthError(`Access Denied. Your role is "${role || 'None'}". Authorized roles: "Admin", "Librarian".`);
+        setAuthError(`Access Denied: Your account role is "${role}". Contact the lead librarian for authorization.`);
       } else {
-        setAuthError(`Profile Not Found. No Firestore document found for UID "${user.uid}" in the 'users' collection.`);
+        setAuthError(`Registration Required: No administrative profile found for your account.`);
       }
     }
   }, [user, isUserLoading, userProfile, isProfileLoading, router]);
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    toast({ title: "Copied", description: "Value copied to clipboard." });
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const handleGoogleLogin = async () => {
-    if (!auth || !firestore) return;
-    
+    if (!auth) return;
     setIsGoogleLoading(true);
     setAuthError(null);
     const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ 
-      prompt: 'select_account'
-    });
+    provider.setCustomParameters({ prompt: 'select_account' });
 
     try {
       await signInWithPopup(auth, provider);
     } catch (error: any) {
-      if (error.code === 'auth/invalid-credential') {
-        setAuthError(`Auth Failed: 'invalid-credential'. Domain authorization missing.`);
-      } else if (error.code !== 'auth/popup-closed-by-user') {
+      if (error.code !== 'auth/popup-closed-by-user') {
         setAuthError(error.message);
       }
     } finally {
@@ -109,8 +83,7 @@ export default function AdminLogin() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-        <h2 className="text-xl font-bold font-headline">Checking Authorization</h2>
-        <p className="text-muted-foreground mt-2 italic">Verifying your role...</p>
+        <h2 className="text-xl font-bold">Verifying Credentials</h2>
       </div>
     );
   }
@@ -134,52 +107,26 @@ export default function AdminLogin() {
             <p className="text-muted-foreground italic">New Era University Library</p>
           </div>
 
-          {/* Diagnostic Info */}
-          <div className="mb-6 p-4 bg-secondary/50 rounded-2xl border border-primary/10 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                <Globe className="w-3 h-3" /> Current Domain
-              </span>
-            </div>
-            <code className="block bg-background/50 p-2 rounded font-mono text-[10px] break-all leading-relaxed">
-              {currentOrigin || 'Detecting...'}
-            </code>
-            <p className="text-[9px] text-muted-foreground leading-relaxed italic">
-              Ensure cloudworkstations.dev is in <strong>Authorized Domains</strong> in Firebase Console (Authentication &gt; Settings).
-            </p>
-          </div>
-
           {authError && (
-            <Alert variant="destructive" className="mb-6 bg-destructive/10 border-destructive/20 text-destructive overflow-hidden">
+            <Alert variant="destructive" className="mb-6 bg-destructive/10 border-destructive/20 text-destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle className="font-bold">Access Check Failed</AlertTitle>
-              <AlertDescription className="text-xs mt-2 space-y-3">
-                <p>{authError}</p>
-                {user && (
-                  <div className="pt-2 border-t border-destructive/20">
-                    <p className="font-bold mb-1">Your UID:</p>
-                    <div className="flex items-center gap-2">
-                      <code className="bg-background/50 p-1.5 rounded flex-1 truncate font-mono text-[10px]">{user.uid}</code>
-                      <Button size="icon" variant="outline" className="h-8 w-8 shrink-0" onClick={() => copyToClipboard(user.uid)}>
-                        {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                      </Button>
-                    </div>
-                  </div>
-                )}
+              <AlertTitle className="font-bold">Login Failed</AlertTitle>
+              <AlertDescription className="text-xs mt-1">
+                {authError}
               </AlertDescription>
             </Alert>
           )}
 
           <Tabs defaultValue="google" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-8">
-              <TabsTrigger value="google">Google Login</TabsTrigger>
+              <TabsTrigger value="google">Google</TabsTrigger>
               <TabsTrigger value="email">Manual</TabsTrigger>
             </TabsList>
 
             <TabsContent value="google" className="space-y-4">
               <Button 
                 onClick={handleGoogleLogin}
-                className="w-full h-14 font-black text-lg shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
+                className="w-full h-14 font-black text-lg shadow-lg hover:scale-[1.01] transition-transform"
                 disabled={isGoogleLoading}
               >
                 {isGoogleLoading ? (
@@ -187,7 +134,7 @@ export default function AdminLogin() {
                 ) : (
                   <Chrome className="mr-2 w-6 h-6" />
                 )}
-                {isGoogleLoading ? "Connecting..." : "Login with NEU Google"}
+                {isGoogleLoading ? "Connecting..." : "NEU Institutional Login"}
               </Button>
             </TabsContent>
 

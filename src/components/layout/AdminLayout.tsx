@@ -34,14 +34,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
-  // We are "syncing" if auth is loading OR if we have a user but their profile is still loading.
+  // Robust check: We are syncing if auth is checking OR if a user exists but we don't have their profile yet.
   const isSyncing = isUserLoading || (!!user && isProfileLoading);
   
   const role = userProfile?.role;
   const isAdmin = role === 'Admin' || role === 'Librarian';
 
   useEffect(() => {
-    // Only make a routing decision when loading is complete.
     if (!isSyncing) {
       if (!user || !isAdmin) {
         router.replace('/admin/login');
@@ -63,8 +62,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-        <h2 className="text-xl font-bold font-headline">Checking Authorization</h2>
-        <p className="text-muted-foreground mt-2 italic">Verifying your role...</p>
+        <h2 className="text-xl font-bold font-headline">Authenticating...</h2>
+        <p className="text-muted-foreground mt-2 italic">Verifying administrative access</p>
       </div>
     );
   }
@@ -124,7 +123,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-1">Signed in as</p>
             <p className="text-sm font-bold truncate text-primary">{userProfile?.fullName || user.displayName || user.email}</p>
             <Badge variant="outline" className="mt-2 text-[8px] h-4 uppercase border-accent text-accent">
-              {role || 'Authorized'}
+              {role}
             </Badge>
           </div>
           <Button 
