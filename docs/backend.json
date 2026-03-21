@@ -2,10 +2,9 @@
 {
   "entities": {
     "User": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
+      "description": "Represents an individual associated with New Era University (NEU), including students, faculty, employees, librarians, and administrators.",
       "type": "object",
-      "description": "Represents an individual associated with New Era University (NEU), including students, faculty, employees, librarians, and administrators. This entity stores their institutional details and role within the system.",
       "properties": {
         "id": {
           "type": "string",
@@ -13,7 +12,7 @@
         },
         "institutionalEmail": {
           "type": "string",
-          "description": "The official NEU institutional email address of the user. This is used for login via Google-based authentication and serves as a unique identifier for the user.",
+          "description": "The official NEU institutional email address.",
           "format": "email"
         },
         "fullName": {
@@ -22,35 +21,26 @@
         },
         "idNumber": {
           "type": "string",
-          "description": "The unique identification number assigned by NEU (e.g., student ID, employee ID)."
+          "description": "The unique identification number assigned by NEU."
         },
         "college": {
           "type": "string",
-          "description": "The college or department within NEU that the user is affiliated with (e.g., CICS, Education, Nursing, Arts, Engineering, Business)."
-        },
-        "program": {
-          "type": "string",
-          "description": "The specific academic program or course of study the user is pursuing (e.g., BSIT, BSCS, BSME). This property may be null for faculty, employees, librarians, or administrators not currently enrolled in a program."
+          "description": "The college or department within NEU."
         },
         "role": {
           "type": "string",
-          "description": "The role of the user within NEU and the application system. This determines their categorization and access privileges.",
-          "items": {
-            "type": "string"
-          }
+          "description": "The role of the user within NEU (e.g., Student, Librarian, Admin)."
         },
         "isActive": {
           "type": "boolean",
-          "description": "A flag indicating whether the user's account is currently active. If 'false', the user is considered blocked and cannot log visits or access administrative features."
+          "description": "Flag indicating if the account is active."
         },
         "createdAt": {
           "type": "string",
-          "description": "The date and time when this user record was first created in the system.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "The date and time when this user record was last updated.",
           "format": "date-time"
         }
       },
@@ -58,18 +48,14 @@
         "id",
         "institutionalEmail",
         "fullName",
-        "idNumber",
         "role",
-        "isActive",
-        "createdAt",
-        "updatedAt"
+        "isActive"
       ]
     },
     "Visit": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Visit",
+      "description": "Records a single instance of a user visiting the NEU Library.",
       "type": "object",
-      "description": "Records a single instance of a user visiting the NEU Library, capturing the purpose of their visit and the precise entry time.",
       "properties": {
         "id": {
           "type": "string",
@@ -77,20 +63,13 @@
         },
         "visitorEmail": {
           "type": "string",
-          "description": "The institutional email of the visitor.",
           "format": "email"
         },
-        "visitorId": {
-          "type": "string",
-          "description": "Optional reference to the User entity (UID) if the user was authenticated."
-        },
         "purpose": {
-          "type": "string",
-          "description": "The primary reason or activity for the user's visit to the library."
+          "type": "string"
         },
         "entryTime": {
           "type": "string",
-          "description": "The precise date and time when the user checked into the library.",
           "format": "date-time"
         }
       },
@@ -109,71 +88,29 @@
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores individual user profiles, identified by their Firebase Authentication User ID. Contains institutional details and their current status. Users can read their own profiles. Admins have read, create, update, and delete access for account management.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The Firebase Authentication User ID (UID) of the user."
-            }
-          ]
-        }
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
       },
-      {
-        "path": "/roles_admin/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "A collection where the existence of a document signifies 'admin' privileges for the associated userId. Only existing admins can create or delete documents in this collection.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The Firebase Authentication User ID (UID) of the user who holds the 'admin' role."
-            }
-          ]
-        }
+      "description": "Stores individual user profiles. Users can read their own profiles; admins/librarians have broader access."
+    },
+    "/roles_admin/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
       },
-      {
-        "path": "/roles_librarian/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "A collection where the existence of a document signifies 'librarian' privileges for the associated userId. Only existing admins can create or delete documents in this collection.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The Firebase Authentication User ID (UID) of the user who holds the 'librarian' role."
-            }
-          ]
-        }
+      "description": "Signifies 'admin' privileges for the associated userId."
+    },
+    "/roles_librarian/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
       },
-      {
-        "path": "/visits/{visitId}",
-        "definition": {
-          "entityName": "Visit",
-          "schema": {
-            "$ref": "#/backend/entities/Visit"
-          },
-          "description": "Records individual library visits. Authenticated NEU staff can view logs, while any student with an NEU email can create a record.",
-          "params": [
-            {
-              "name": "visitId",
-              "description": "The unique identifier for a specific library visit."
-            }
-          ]
-        }
-      }
-    ]
+      "description": "Signifies 'librarian' privileges for the associated userId."
+    },
+    "/visits/{visitId}": {
+      "schema": {
+        "$ref": "#/entities/Visit"
+      },
+      "description": "Records individual library visits."
+    }
   }
 }

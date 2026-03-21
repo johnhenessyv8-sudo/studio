@@ -7,12 +7,13 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, ShieldCheck, Chrome, Mail, Lock } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Chrome, Mail, Lock, Copy, Check } from 'lucide-react';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function AdminLogin() {
   const { auth, firestore } = useAuth();
@@ -23,6 +24,7 @@ export default function AdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const adminRoleRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -34,14 +36,14 @@ export default function AdminLogin() {
     return doc(firestore, 'roles_librarian', user.uid);
   }, [firestore, user]);
 
-  const { data: adminRole } = useDoc(adminRoleRef);
-  const { data: librarianRole } = useDoc(librarianRoleRef);
+  const { data: adminRole, isLoading: isAdminLoading } = useDoc(adminRoleRef);
+  const { data: librarianRole, isLoading: isLibrarianLoading } = useDoc(librarianRoleRef);
 
   useEffect(() => {
-    if (!isUserLoading && user && (adminRole || librarianRole)) {
+    if (!isUserLoading && !isAdminLoading && !isLibrarianLoading && user && (adminRole || librarianRole)) {
       router.push('/admin/dashboard');
     }
-  }, [user, isUserLoading, adminRole, librarianRole, router]);
+  }, [user, isUserLoading, isAdminLoading, isLibrarianLoading, adminRole, librarianRole, router]);
 
   const handleGoogleLogin = async () => {
     if (!auth) return;
@@ -71,6 +73,18 @@ export default function AdminLogin() {
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const copyUid = () => {
+    if (user?.uid) {
+      navigator.clipboard.writeText(user.uid);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast({
+        title: "UID Copied",
+        description: "You can now use this to grant yourself admin access in the console."
+      });
     }
   };
 
@@ -152,10 +166,30 @@ export default function AdminLogin() {
             </TabsContent>
           </Tabs>
           
-          {user && !adminRole && !librarianRole && !isUserLoading && (
-            <p className="mt-4 text-sm text-destructive text-center font-bold animate-in fade-in slide-in-from-top-2">
-              Access Denied: You do not have administrator or librarian privileges.
-            </p>
+          {user && !adminRole && !librarianRole && !isUserLoading && !isAdminLoading && !isLibrarianLoading && (
+            <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-2">
+              <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive">
+                <AlertTitle className="font-bold">Access Denied</AlertTitle>
+                <AlertDescription>
+                  You are signed in but do not have administrator or librarian privileges.
+                </AlertDescription>
+              </Alert>
+              
+              <div className="p-4 bg-secondary/50 rounded-xl border border-primary/10">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Your User ID (UID)</p>
+                <div className="flex items-center justify-between gap-2">
+                  <code className="text-xs font-mono bg-background px-2 py-1 rounded border overflow-x-auto whitespace-nowrap flex-1">
+                    {user.uid}
+                  </code>
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={copyUid}>
+                    {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-2 leading-tight">
+                  Copy this UID and add it to the <code className="text-primary font-bold">roles_admin</code> collection in the Firebase Console to grant yourself access.
+                </p>
+              </div>
+            </div>
           )}
 
           <div className="mt-8 pt-6 border-t border-muted/20 text-center">
