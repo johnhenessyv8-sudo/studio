@@ -1,4 +1,3 @@
-
 'use client';
     
 import { useState, useEffect, useRef } from 'react';
@@ -36,7 +35,7 @@ export function useDoc<T = any>(
 
   const [data, setData] = useState<StateDataType>(null);
   // Default to true if we have a ref to fetch, false if we don't.
-  const [isLoading, setIsLoading] = useState<boolean>(!!memoizedTargetRef);
+  const [isLoading, setIsLoading] = useState<boolean>(!!memoizedDocRef);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   // Use a ref to track if we've initialized for the current memoizedDocRef

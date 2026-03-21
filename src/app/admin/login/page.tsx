@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -49,6 +48,7 @@ export default function AdminLogin() {
 
   useEffect(() => {
     // Wait for everything to settle before redirecting to dashboard.
+    // We only redirect if we have a user AND their profile is loaded AND they are an admin.
     if (!isUserLoading && user && !isProfileLoading) {
       const role = userProfile?.role;
       const isAdmin = role === 'Admin' || role === 'Librarian';
@@ -58,6 +58,7 @@ export default function AdminLogin() {
       } else if (userProfile) {
         setAuthError(`Access Denied. Your profile exists, but your role is "${role || 'None'}". Authorized roles: "Admin", "Librarian".`);
       } else {
+        // If profile is missing but user is logged in, show an error.
         setAuthError(`Profile Not Found. No Firestore document found for UID "${user.uid}" in the 'users' collection.`);
       }
     }
