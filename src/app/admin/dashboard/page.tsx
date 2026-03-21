@@ -42,10 +42,10 @@ export default function Dashboard() {
   const stats = useMemo(() => {
     if (!visits) return { today: 0, week: 0, month: 0, purposeData: [], collegeData: [], recent: [] };
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const weekStart = startOfWeek(new Date());
-    const monthStart = startOfMonth(new Date());
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekStart = startOfWeek(now);
+    const monthStart = startOfMonth(now);
 
     let todayCount = 0;
     let weekCount = 0;
@@ -63,7 +63,7 @@ export default function Dashboard() {
 
       purposes[v.purpose] = (purposes[v.purpose] || 0) + 1;
 
-      const user = users?.find(u => u.institutionalEmail === v.visitorEmail);
+      const user = users?.find(u => u.institutionalEmail?.toLowerCase() === v.visitorEmail?.toLowerCase());
       const college = user?.college || 'Others';
       colleges[college] = (colleges[college] || 0) + 1;
     });

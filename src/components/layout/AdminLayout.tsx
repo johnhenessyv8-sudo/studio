@@ -33,18 +33,44 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     async function verifyAccess() {
       if (isUserLoading) return;
+      
       if (!user) {
         router.replace('/admin/login');
         return;
       }
+      
       if (!firestore) return;
 
       try {
+        // 1. Try fetching by exact UID
         const userDocRef = doc(firestore, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
         
+        let profileData = null;
+
         if (userSnap.exists()) {
-          const profileData = userSnap.data();
+          profileData = userSnap.data();
+        } else if (user.email) {
+          // 2. Fallback: Search by institutional email if UID isn't linked yet
+          const q = query(
+            collection(firestore, 'users'), 
+            where('institutionalEmail', '==', user.email.toLowerCase())
+          );
+          const querySnap = await getDocs(q);
+          
+          if (!querySnap.empty) {
+            const foundDoc = querySnap.docs[0];
+            profileData = foundDoc.data();
+            
+            // Link UID to this profile automatically
+            await updateDoc(doc(firestore, 'users', foundDoc.id), {
+              id: user.uid,
+              updatedAt: serverTimestamp()
+            });
+          }
+        }
+
+        if (profileData) {
           const isAdmin = profileData.role === 'Admin' || profileData.role === 'Librarian';
           if (isAdmin) {
             setProfile(profileData);
@@ -52,30 +78,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           } else {
             router.replace('/admin/login');
           }
-        } else if (user.email) {
-          const q = query(collection(firestore, 'users'), where('institutionalEmail', '==', user.email));
-          const querySnap = await getDocs(q);
-          if (!querySnap.empty) {
-            const foundDoc = querySnap.docs[0];
-            const data = foundDoc.data();
-            const isAdmin = data.role === 'Admin' || data.role === 'Librarian';
-            if (isAdmin) {
-              setProfile(data);
-              await updateDoc(doc(firestore, 'users', foundDoc.id), {
-                id: user.uid,
-                updatedAt: serverTimestamp()
-              });
-              setIsVerifying(false);
-            } else {
-              router.replace('/admin/login');
-            }
-          } else {
-            router.replace('/admin/login');
-          }
         } else {
           router.replace('/admin/login');
         }
       } catch (error) {
+        console.error("Access verification error:", error);
         router.replace('/admin/login');
       }
     }
@@ -97,8 +104,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-        <h2 className="text-xl font-bold font-headline">Authenticating...</h2>
-        <p className="text-muted-foreground mt-2 italic">Verifying administrative access</p>
+        <h2 className="text-xl font-bold font-headline">Verifying Profile...</h2>
+        <p className="text-muted-foreground mt-2 italic">Checking administrative credentials</p>
       </div>
     );
   }
@@ -120,7 +127,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 alt="NEU Logo" 
                 fill 
                 className="object-contain"
-                data-ai-hint="university logo"
               />
             )}
           </div>

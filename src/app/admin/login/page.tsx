@@ -39,17 +39,22 @@ export default function AdminLogin() {
       
       setIsVerifying(true);
       try {
+        // Search logic: try UID first, then email fallback
         const userDocRef = doc(firestore, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
         
         let profile = userSnap.exists() ? userSnap.data() : null;
 
         if (!profile && user.email) {
-          const q = query(collection(firestore, 'users'), where('institutionalEmail', '==', user.email));
+          const q = query(
+            collection(firestore, 'users'), 
+            where('institutionalEmail', '==', user.email.toLowerCase())
+          );
           const querySnap = await getDocs(q);
           if (!querySnap.empty) {
             const foundDoc = querySnap.docs[0];
             profile = foundDoc.data();
+            // Link UID for future logins
             await updateDoc(doc(firestore, 'users', foundDoc.id), {
               id: user.uid,
               updatedAt: serverTimestamp()
@@ -65,7 +70,7 @@ export default function AdminLogin() {
             setAuthError(`Access Denied: Your profile role is "${profile.role}". Administrative access required.`);
           }
         } else {
-          setAuthError(`Profile not found for ${user.email}. Ensure your account is pre-registered.`);
+          setAuthError(`Profile not found for ${user.email}. Ensure your account is pre-registered in the library system.`);
         }
       } catch (err: any) {
         setAuthError(err.message);
