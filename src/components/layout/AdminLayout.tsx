@@ -8,7 +8,8 @@ import {
   ClipboardList, 
   Users, 
   LogOut,
-  Loader2 
+  Loader2,
+  Settings 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
@@ -32,7 +33,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     async function verifyAccess() {
-      // Strict wait for auth resolution
       if (isUserLoading) return;
       
       if (!user) {
@@ -43,7 +43,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (!firestore) return;
 
       try {
-        // Try direct lookup by UID
         const userDocRef = doc(firestore, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
         
@@ -52,7 +51,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (userSnap.exists()) {
           profileData = userSnap.data();
         } else if (user.email) {
-          // Fallback: lookup by email to link session
           const q = query(
             collection(firestore, 'users'), 
             where('institutionalEmail', '==', user.email.toLowerCase())
@@ -62,8 +60,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           if (!querySnap.empty) {
             const foundDoc = querySnap.docs[0];
             profileData = foundDoc.data();
-            
-            // Sync the ID field to the current provider's UID
             await updateDoc(foundDoc.ref, {
               id: user.uid,
               updatedAt: serverTimestamp()
@@ -115,6 +111,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'Visitor Log', href: '/admin/visitor-log', icon: ClipboardList },
     { name: 'Account Management', href: '/admin/accounts', icon: Users },
+    { name: 'Settings', href: '/admin/settings', icon: Settings },
   ];
 
   return (

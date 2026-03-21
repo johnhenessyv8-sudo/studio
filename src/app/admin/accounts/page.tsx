@@ -13,7 +13,11 @@ import {
   User as UserIcon,
   BookOpen,
   ChevronDown,
-  Loader2
+  Loader2,
+  MoreVertical,
+  Edit2,
+  CheckCircle2,
+  Key
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -23,7 +27,8 @@ import {
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
@@ -36,20 +41,23 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useFirestore, useCollection, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError, useAuth } from '@/firebase';
 import { collection, doc, serverTimestamp, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'firebase/auth';
 import { firebaseConfig } from '@/firebase/config';
 
 export default function AccountManagement() {
   const { user } = useUser();
+  const auth = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -112,7 +120,7 @@ export default function AccountManagement() {
         description: `${formData.fullName} added. Default password: mypassword123`
       });
       
-      setIsDialogOpen(false);
+      setIsAddOpen(false);
       setFormData({ fullName: '', email: '', idNumber: '', college: '', role: 'Student' });
     } catch (error: any) {
       toast({
@@ -122,6 +130,56 @@ export default function AccountManagement() {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!firestore || !editingUser || isSaving) return;
+
+    setIsSaving(true);
+    const userRef = doc(firestore, 'users', editingUser.id);
+    const updatedData = {
+      fullName: editingUser.fullName,
+      idNumber: editingUser.idNumber,
+      college: editingUser.college,
+      role: editingUser.role,
+      updatedAt: serverTimestamp()
+    };
+
+    try {
+      await updateDoc(userRef, updatedData);
+      toast({
+        title: "Profile Updated",
+        description: "User details have been saved successfully."
+      });
+      setIsEditOpen(false);
+    } catch (error: any) {
+      const permissionError = new FirestorePermissionError({
+        path: userRef.path,
+        operation: 'update',
+        requestResourceData: updatedData,
+      });
+      errorEmitter.emit('permission-error', permissionError);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleResetPassword = async (email: string) => {
+    if (!auth) return;
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast({
+        title: "Reset Link Sent",
+        description: `Password reset email sent to ${email}`
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message
+      });
     }
   };
 
@@ -142,7 +200,7 @@ export default function AccountManagement() {
   };
 
   const handleDeleteUser = (userItem: any) => {
-    if (!firestore || !window.confirm(`Are you sure you want to delete ${userItem.fullName}?`)) return;
+    if (!firestore || !window.confirm(`Are you sure you want to permanently delete ${userItem.fullName}?`)) return;
     const userRef = doc(firestore, 'users', userItem.id);
     
     deleteDoc(userRef)
@@ -174,7 +232,7 @@ export default function AccountManagement() {
               Total Users: {users?.length || 0}
             </Badge>
             
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-accent hover:bg-accent/80 text-white font-bold">
                   <UserPlus className="mr-2 w-4 h-4" /> Add User
@@ -284,6 +342,7 @@ export default function AccountManagement() {
           </div>
         </div>
 
+        {/* Filters */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-6 bg-card border rounded-2xl shadow-lg">
           <div className="md:col-span-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -343,6 +402,7 @@ export default function AccountManagement() {
           </DropdownMenu>
         </div>
 
+        {/* User Table */}
         <div className="bg-card border rounded-2xl overflow-hidden shadow-xl">
           <Table>
             <TableHeader className="bg-secondary/50">
@@ -381,25 +441,29 @@ export default function AccountManagement() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center justify-center gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="text-muted-foreground hover:text-accent hover:bg-accent/10" 
-                          title={u.isActive ? "Block User" : "Activate User"}
-                          onClick={() => handleToggleActive(u)}
-                        >
-                          <Ban className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10" 
-                          title="Delete User"
-                          onClick={() => handleDeleteUser(u)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                      <div className="flex items-center justify-center">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={() => { setEditingUser(u); setIsEditOpen(true); }}>
+                              <Edit2 className="w-4 h-4 mr-2 text-primary" /> Edit Profile
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleToggleActive(u)}>
+                              <Ban className="w-4 h-4 mr-2 text-accent" /> {u.isActive ? 'Block User' : 'Unblock User'}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleResetPassword(u.institutionalEmail)}>
+                              <Key className="w-4 h-4 mr-2 text-blue-500" /> Reset Password
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive focus:bg-destructive/10" onClick={() => handleDeleteUser(u)}>
+                              <Trash2 className="w-4 h-4 mr-2" /> Delete Account
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -408,6 +472,74 @@ export default function AccountManagement() {
             </TableBody>
           </Table>
         </div>
+
+        {/* Edit Dialog */}
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Edit User Profile</DialogTitle>
+              <DialogDescription>Modify information for {editingUser?.fullName}</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleUpdateUser} className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Full Name</Label>
+                <Input 
+                  id="edit-name" 
+                  value={editingUser?.fullName || ''}
+                  onChange={(e) => setEditingUser({...editingUser, fullName: e.target.value})}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-id">ID Number</Label>
+                <Input 
+                  id="edit-id" 
+                  value={editingUser?.idNumber || ''}
+                  onChange={(e) => setEditingUser({...editingUser, idNumber: e.target.value})}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>College</Label>
+                  <Select 
+                    value={editingUser?.college || ''} 
+                    onValueChange={(val) => setEditingUser({...editingUser, college: val})}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CICS">CICS</SelectItem>
+                      <SelectItem value="Engineering">Engineering</SelectItem>
+                      <SelectItem value="Nursing">Nursing</SelectItem>
+                      <SelectItem value="Education">Education</SelectItem>
+                      <SelectItem value="Business">Business</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Role</Label>
+                  <Select 
+                    value={editingUser?.role || ''} 
+                    onValueChange={(val) => setEditingUser({...editingUser, role: val})}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Student">Student</SelectItem>
+                      <SelectItem value="Librarian">Librarian</SelectItem>
+                      <SelectItem value="Admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter className="pt-4">
+                <Button type="submit" className="w-full" disabled={isSaving}>
+                  {isSaving && <Loader2 className="animate-spin mr-2" />}
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   );

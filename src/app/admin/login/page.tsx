@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, ShieldCheck, Chrome, Loader2, AlertCircle, Info, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Chrome, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth, useUser, useFirestore } from '@/firebase';
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -25,13 +25,6 @@ export default function AdminLogin() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [currentOrigin, setCurrentOrigin] = useState('');
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setCurrentOrigin(window.location.origin);
-    }
-  }, []);
 
   useEffect(() => {
     async function checkAccess() {
@@ -39,13 +32,11 @@ export default function AdminLogin() {
       
       setIsVerifying(true);
       try {
-        // Try direct lookup by UID
         const userDocRef = doc(firestore, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
         
         let profile = userSnap.exists() ? userSnap.data() : null;
 
-        // Fallback: lookup by email to link session
         if (!profile && user.email) {
           const q = query(
             collection(firestore, 'users'), 
@@ -55,7 +46,6 @@ export default function AdminLogin() {
           if (!querySnap.empty) {
             const foundDoc = querySnap.docs[0];
             profile = foundDoc.data();
-            // Link the profile to this session's UID
             await updateDoc(foundDoc.ref, {
               id: user.uid,
               updatedAt: serverTimestamp()
@@ -98,7 +88,6 @@ export default function AdminLogin() {
     try {
       await signInWithPopup(auth, provider);
     } catch (error: any) {
-      // Ignore user-cancelled login
       if (error.code !== 'auth/popup-closed-by-user') {
         setAuthError(error.message);
       }
@@ -219,27 +208,6 @@ export default function AdminLogin() {
               </form>
             </TabsContent>
           </Tabs>
-        </div>
-        
-        <div className="mt-8 p-6 bg-secondary/50 border rounded-2xl space-y-4">
-          <div className="flex items-center gap-2 text-primary">
-            <Info className="w-4 h-4" />
-            <h3 className="text-xs font-bold uppercase tracking-widest">Environment Diagnostic</h3>
-          </div>
-          <div className="space-y-2">
-            <p className="text-[10px] text-muted-foreground uppercase font-black">Current Domain Origin:</p>
-            <code className="block p-2 bg-background rounded text-[10px] break-all font-mono text-primary border border-primary/20">
-              {currentOrigin}
-            </code>
-            <p className="text-[9px] text-muted-foreground leading-relaxed italic">
-              Verify this domain is in your <strong>Authorized Domains</strong> in the Firebase Console (Authentication &gt; Settings).
-            </p>
-          </div>
-          <Button variant="ghost" size="sm" className="w-full text-[10px] font-bold h-7 gap-2" asChild>
-            <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer">
-              Open Firebase Console <ExternalLink className="w-3 h-3" />
-            </a>
-          </Button>
         </div>
       </div>
     </div>
