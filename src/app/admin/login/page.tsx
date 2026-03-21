@@ -45,7 +45,7 @@ export default function AdminLogin() {
         
         let profile = userSnap.exists() ? userSnap.data() : null;
 
-        // Attempt 2: Fallback to email search (Crucial for linking newly added librarians)
+        // Attempt 2: Fallback to email search (Crucial for linking newly added admins/librarians)
         if (!profile && user.email) {
           const q = query(
             collection(firestore, 'users'), 
@@ -113,7 +113,7 @@ export default function AdminLogin() {
     try {
       await signInWithEmailAndPassword(auth, email.toLowerCase(), password);
     } catch (error: any) {
-      if (error.code === 'auth/invalid-credential') {
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
         setAuthError("Authentication Failed: The email or password provided is incorrect.");
       } else {
         setAuthError(error.message);
