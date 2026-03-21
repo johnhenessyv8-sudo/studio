@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { 
   Search, 
@@ -9,7 +9,10 @@ import {
   Trash2, 
   Ban, 
   ArrowUpDown,
-  UserPlus
+  UserPlus,
+  Mail,
+  User as UserIcon,
+  BookOpen
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -21,17 +24,96 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-
-const USERS_DATA = [
-  { id: '20-12345', name: 'Juan Dela Cruz', college: 'CICS', type: 'Student', status: 'Active' },
-  { id: '21-54321', name: 'Maria Santos', college: 'Business', type: 'Student', status: 'Active' },
-  { id: 'PROF-001', name: 'Dr. Sarah Jane', college: 'Education', type: 'Faculty', status: 'Active' },
-  { id: 'ST-045', name: 'Elena Gilbert', college: 'Nursing', type: 'Staff', status: 'Blocked' },
-  { id: '19-98765', name: 'Robert Smith', college: 'Engineering', type: 'Student', status: 'Active' },
-  { id: '22-11099', name: 'Mark Wilson', college: 'CICS', type: 'Student', status: 'Active' },
-];
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AccountManagement() {
+  const { firestore } = useFirestore();
+  const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  // Form State
+  const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
+    idNumber: '',
+    college: '',
+    role: 'Student'
+  });
+
+  const usersRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'users');
+  }, [firestore]);
+
+  const { data: users, isLoading } = useCollection(usersRef);
+
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!firestore) return;
+
+    if (!formData.email.endsWith('@neu.edu.ph')) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Email",
+        description: "Only @neu.edu.ph institutional emails are allowed."
+      });
+      return;
+    }
+
+    try {
+      // Note: In a real production app, you might want to use a Firebase Admin SDK or Cloud Function 
+      // to create the Auth user too. For this prototype, we'll create the Firestore record.
+      const userId = formData.idNumber || `user-${Date.now()}`;
+      const userRef = doc(firestore, 'users', userId);
+      
+      await setDoc(userRef, {
+        id: userId,
+        fullName: formData.fullName,
+        institutionalEmail: formData.email,
+        idNumber: formData.idNumber,
+        college: formData.college,
+        role: [formData.role],
+        isActive: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      toast({
+        title: "User Added",
+        description: `${formData.fullName} has been added successfully.`
+      });
+      
+      setIsDialogOpen(false);
+      setFormData({ fullName: '', email: '', idNumber: '', college: '', role: 'Student' });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message
+      });
+    }
+  };
+
+  const filteredUsers = users?.filter(user => 
+    user.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.idNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.institutionalEmail?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <AdminLayout>
       <div className="space-y-8">
@@ -42,11 +124,102 @@ export default function AccountManagement() {
           </div>
           <div className="flex items-center gap-3">
             <Badge className="bg-primary/20 text-primary border-primary h-10 px-4 text-sm font-bold">
-              Total Users: 1,248
+              Total Users: {users?.length || 0}
             </Badge>
-            <Button className="bg-accent hover:bg-accent/80 text-white font-bold">
-              <UserPlus className="mr-2 w-4 h-4" /> Add User
-            </Button>
+            
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-accent hover:bg-accent/80 text-white font-bold">
+                  <UserPlus className="mr-2 w-4 h-4" /> Add User
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Add New User</DialogTitle>
+                  <DialogDescription>
+                    Create a new profile for a student or staff member.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleAddUser} className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName">Full Name</Label>
+                    <div className="relative">
+                      <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input 
+                        id="fullName" 
+                        placeholder="Juan Dela Cruz" 
+                        className="pl-10"
+                        value={formData.fullName}
+                        onChange={(e) => setFormData({...formData, fullName: e.target.value})}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Institutional Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input 
+                        id="email" 
+                        type="email" 
+                        placeholder="jdelacruz@neu.edu.ph" 
+                        className="pl-10"
+                        value={formData.email}
+                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="idNumber">Student/Staff ID</Label>
+                    <div className="relative">
+                      <BookOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input 
+                        id="idNumber" 
+                        placeholder="20-12345" 
+                        className="pl-10"
+                        value={formData.idNumber}
+                        onChange={(e) => setFormData({...formData, idNumber: e.target.value})}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="college">College</Label>
+                      <Select value={formData.college} onValueChange={(val) => setFormData({...formData, college: val})}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="CICS">CICS</SelectItem>
+                          <SelectItem value="Engineering">Engineering</SelectItem>
+                          <SelectItem value="Nursing">Nursing</SelectItem>
+                          <SelectItem value="Education">Education</SelectItem>
+                          <SelectItem value="Business">Business</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="role">Role</Label>
+                      <Select value={formData.role} onValueChange={(val) => setFormData({...formData, role: val})}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Student">Student</SelectItem>
+                          <SelectItem value="Faculty">Faculty</SelectItem>
+                          <SelectItem value="Staff">Staff</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter className="pt-4">
+                    <Button type="submit" className="w-full">Save User Profile</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -57,6 +230,8 @@ export default function AccountManagement() {
             <Input 
               placeholder="Search Name or ID..." 
               className="pl-10 h-11 bg-secondary/30"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           
@@ -113,42 +288,52 @@ export default function AccountManagement() {
           <Table>
             <TableHeader className="bg-secondary/50">
               <TableRow>
-                <TableHead className="font-bold">Student/Staff ID</TableHead>
+                <TableHead className="font-bold">ID Number</TableHead>
                 <TableHead className="font-bold">Full Name</TableHead>
                 <TableHead className="font-bold">College</TableHead>
-                <TableHead className="font-bold">Type</TableHead>
+                <TableHead className="font-bold">Role</TableHead>
                 <TableHead className="font-bold">Status</TableHead>
                 <TableHead className="font-bold text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {USERS_DATA.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-mono text-xs">{user.id}</TableCell>
-                  <TableCell className="font-bold text-primary">{user.name}</TableCell>
-                  <TableCell className="text-xs">{user.college}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-[10px] uppercase border-accent text-accent">
-                      {user.type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={user.status === 'Active' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}>
-                      {user.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-center gap-2">
-                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-accent hover:bg-accent/10" title="Block User">
-                        <Ban className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10" title="Delete User">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-10">Loading users...</TableCell>
                 </TableRow>
-              ))}
+              ) : filteredUsers?.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-10">No users found.</TableCell>
+                </TableRow>
+              ) : (
+                filteredUsers?.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-mono text-xs">{user.idNumber || user.id}</TableCell>
+                    <TableCell className="font-bold text-primary">{user.fullName}</TableCell>
+                    <TableCell className="text-xs">{user.college || 'N/A'}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-[10px] uppercase border-accent text-accent">
+                        {Array.isArray(user.role) ? user.role[0] : user.role}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={user.isActive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}>
+                        {user.isActive ? 'Active' : 'Blocked'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-center gap-2">
+                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-accent hover:bg-accent/10" title="Block User">
+                          <Ban className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10" title="Delete User">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>

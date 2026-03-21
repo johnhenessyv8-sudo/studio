@@ -1,19 +1,28 @@
 
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ShieldCheck, Chrome } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ArrowLeft, ShieldCheck, Chrome, Mail, Lock } from 'lucide-react';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AdminLogin() {
   const { auth, firestore } = useAuth();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const { toast } = useToast();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const adminRoleRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -39,8 +48,29 @@ export default function AdminLogin() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Login failed", error);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Login failed",
+        description: error.message
+      });
+    }
+  };
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!auth) return;
+    setIsSubmitting(true);
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Login failed",
+        description: error.message
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -63,21 +93,70 @@ export default function AdminLogin() {
             <p className="text-muted-foreground">Authorized NEU staff only.</p>
           </div>
 
-          <div className="space-y-4">
-            <Button 
-              onClick={handleGoogleLogin}
-              className="w-full h-12 font-bold text-lg"
-              disabled={isUserLoading}
-            >
-              <Chrome className="mr-2 w-5 h-5" /> Login with Google
-            </Button>
-            
-            {user && !adminRole && !librarianRole && !isUserLoading && (
-              <p className="text-sm text-destructive text-center font-bold animate-in fade-in slide-in-from-top-2">
-                Access Denied: You do not have administrator or librarian privileges.
-              </p>
-            )}
-          </div>
+          <Tabs defaultValue="google" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-8">
+              <TabsTrigger value="google">Google</TabsTrigger>
+              <TabsTrigger value="email">Email</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="google" className="space-y-4">
+              <Button 
+                onClick={handleGoogleLogin}
+                className="w-full h-12 font-bold text-lg"
+                disabled={isUserLoading}
+              >
+                <Chrome className="mr-2 w-5 h-5" /> Login with Google
+              </Button>
+            </TabsContent>
+
+            <TabsContent value="email">
+              <form onSubmit={handleEmailLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Work Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      placeholder="name@neu.edu.ph" 
+                      className="pl-10"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input 
+                      id="password" 
+                      type="password" 
+                      placeholder="••••••••" 
+                      className="pl-10"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full h-12 font-bold text-lg"
+                  disabled={isSubmitting || isUserLoading}
+                >
+                  {isSubmitting ? "Logging in..." : "Login"}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
+          
+          {user && !adminRole && !librarianRole && !isUserLoading && (
+            <p className="mt-4 text-sm text-destructive text-center font-bold animate-in fade-in slide-in-from-top-2">
+              Access Denied: You do not have administrator or librarian privileges.
+            </p>
+          )}
 
           <div className="mt-8 pt-6 border-t border-muted/20 text-center">
             <p className="text-sm text-muted-foreground italic">
