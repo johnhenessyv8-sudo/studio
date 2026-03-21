@@ -34,7 +34,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
-  // Redirection logic: wait until auth loading is finished
+  // Wait until auth loading is finished before checking if redirection is needed
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.replace('/admin/login');

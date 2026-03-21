@@ -32,7 +32,7 @@ export default function AdminLogin() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
-  // Use a stable effect to handle redirection after login state is determined
+  // Handle redirection after login state is determined
   useEffect(() => {
     if (!isUserLoading && user) {
       router.replace('/admin/dashboard');
