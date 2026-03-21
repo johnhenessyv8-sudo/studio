@@ -36,8 +36,8 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { collection, doc, serverTimestamp, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AccountManagement() {
@@ -61,7 +61,7 @@ export default function AccountManagement() {
 
   const { data: users, isLoading } = useCollection(usersRef);
 
-  const handleAddUser = async (e: React.FormEvent) => {
+  const handleAddUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (!firestore) return;
 
@@ -74,36 +74,67 @@ export default function AccountManagement() {
       return;
     }
 
-    try {
-      const userId = formData.idNumber || `user-${Date.now()}`;
-      const userRef = doc(firestore, 'users', userId);
-      
-      await setDoc(userRef, {
-        id: userId,
-        fullName: formData.fullName,
-        institutionalEmail: formData.email,
-        idNumber: formData.idNumber,
-        college: formData.college,
-        role: formData.role,
-        isActive: true,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
+    const userId = formData.idNumber || `user-${Date.now()}`;
+    const userRef = doc(firestore, 'users', userId);
+    const data = {
+      id: userId,
+      fullName: formData.fullName,
+      institutionalEmail: formData.email.toLowerCase(),
+      idNumber: formData.idNumber,
+      college: formData.college,
+      role: formData.role,
+      isActive: true,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
 
-      toast({
-        title: "User Added",
-        description: `${formData.fullName} has been added successfully.`
+    setDoc(userRef, data)
+      .then(() => {
+        toast({
+          title: "User Added",
+          description: `${formData.fullName} has been added successfully.`
+        });
+        setIsDialogOpen(false);
+        setFormData({ fullName: '', email: '', idNumber: '', college: '', role: 'Student' });
+      })
+      .catch(async (error: any) => {
+        const permissionError = new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'create',
+          requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
       });
-      
-      setIsDialogOpen(false);
-      setFormData({ fullName: '', email: '', idNumber: '', college: '', role: 'Student' });
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message
+  };
+
+  const handleToggleActive = (user: any) => {
+    if (!firestore) return;
+    const userRef = doc(firestore, 'users', user.id);
+    const newData = { isActive: !user.isActive, updatedAt: serverTimestamp() };
+    
+    updateDoc(userRef, newData)
+      .catch(async () => {
+        const permissionError = new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'update',
+          requestResourceData: newData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
       });
-    }
+  };
+
+  const handleDeleteUser = (user: any) => {
+    if (!firestore || !window.confirm(`Are you sure you want to delete ${user.fullName}?`)) return;
+    const userRef = doc(firestore, 'users', user.id);
+    
+    deleteDoc(userRef)
+      .catch(async () => {
+        const permissionError = new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
   };
 
   const filteredUsers = users?.filter(user => 
@@ -321,10 +352,22 @@ export default function AccountManagement() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-center gap-2">
-                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-accent hover:bg-accent/10" title="Block User">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="text-muted-foreground hover:text-accent hover:bg-accent/10" 
+                          title={user.isActive ? "Block User" : "Activate User"}
+                          onClick={() => handleToggleActive(user)}
+                        >
                           <Ban className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10" title="Delete User">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10" 
+                          title="Delete User"
+                          onClick={() => handleDeleteUser(user)}
+                        >
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>

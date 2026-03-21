@@ -8,26 +8,41 @@ service cloud.firestore {
     function isSignedIn() {
       return request.auth != null;
     }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && getUserData().role == 'Admin';
+    }
+    
+    function isLibrarian() {
+      return isSignedIn() && (getUserData().role == 'Librarian' || getUserData().role == 'Admin');
+    }
 
     // --- Collection Rules ---
 
     match /users/{userId} {
-      // Any signed-in user can read and update their own profile.
-      // Any signed-in user can read the list (for now, based on your request).
+      // Any signed-in user can read profiles.
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isSignedIn() && request.auth.uid == userId;
-      allow delete: if false; 
+      
+      // Users can manage their own profile.
+      // Admins and Librarians can manage all profiles.
+      allow create, update: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isLibrarian());
+      
+      // Only Admins can permanently delete user records.
+      allow delete: if isAdmin(); 
     }
 
     match /visits/{visitId} {
-      // Any authenticated user can read the logs.
+      // Authenticated users (Admin/Librarian) can view the logs.
       allow read: if isSignedIn();
       
-      // Public creation still allowed for visitors logging via email.
+      // Public creation allowed for visitors logging via institutional email.
       allow create: if request.resource.data.visitorEmail.matches('.*@neu.edu.ph');
       
-      allow update, delete: if false; 
+      allow update, delete: if isAdmin(); 
     }
   }
 }

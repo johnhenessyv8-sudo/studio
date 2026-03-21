@@ -1,3 +1,4 @@
+
 'use client';
     
 import { useState, useEffect, useRef } from 'react';
@@ -33,7 +34,6 @@ export function useDoc<T = any>(
   type StateDataType = WithId<T> | null;
 
   const [data, setData] = useState<StateDataType>(null);
-  // Fixed: Use memoizedDocRef instead of undefined memoizedTargetRef
   const [isLoading, setIsLoading] = useState<boolean>(!!memoizedDocRef);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
