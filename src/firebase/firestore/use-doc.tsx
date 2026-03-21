@@ -77,7 +77,6 @@ export function useDoc<T = any>(
         setError(contextualError);
         setData(null);
         setIsLoading(false);
-        // Do not use console.error, error is handled by the global error listener
         errorEmitter.emit('permission-error', contextualError);
       }
     );

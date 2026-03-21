@@ -32,26 +32,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     async function verifyAccess() {
-      // Don't act while user session is still being checked
       if (isUserLoading) return;
-      
-      // If no user, send to login
       if (!user) {
         router.replace('/admin/login');
         return;
       }
-
       if (!firestore) return;
 
       try {
-        // Step 1: Look up profile by UID
         const userDocRef = doc(firestore, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
         
         if (userSnap.exists()) {
           const profileData = userSnap.data();
           const isAdmin = profileData.role === 'Admin' || profileData.role === 'Librarian';
-          
           if (isAdmin) {
             setProfile(profileData);
             setIsVerifying(false);
@@ -59,18 +53,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             router.replace('/admin/login');
           }
         } else if (user.email) {
-          // Step 2: Fallback search by email (for manually added profiles)
           const q = query(collection(firestore, 'users'), where('institutionalEmail', '==', user.email));
           const querySnap = await getDocs(q);
-          
           if (!querySnap.empty) {
             const foundDoc = querySnap.docs[0];
             const data = foundDoc.data();
             const isAdmin = data.role === 'Admin' || data.role === 'Librarian';
-            
             if (isAdmin) {
               setProfile(data);
-              // Link UID to this profile for future instant lookups
               await updateDoc(doc(firestore, 'users', foundDoc.id), {
                 id: user.uid,
                 updatedAt: serverTimestamp()
@@ -86,7 +76,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           router.replace('/admin/login');
         }
       } catch (error) {
-        console.error("Access verification error:", error);
         router.replace('/admin/login');
       }
     }
@@ -104,10 +93,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   };
 
-  const isSyncing = isUserLoading || isVerifying;
-  const isAdmin = profile?.role === 'Admin' || profile?.role === 'Librarian';
-
-  if (isSyncing) {
+  if (isUserLoading || isVerifying) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
@@ -115,10 +101,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <p className="text-muted-foreground mt-2 italic">Verifying administrative access</p>
       </div>
     );
-  }
-
-  if (!user || !isAdmin) {
-    return null;
   }
 
   const navItems = [
@@ -170,7 +152,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="pt-6 border-t space-y-4 border-muted/20">
           <div className="px-4">
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black mb-1">Signed in as</p>
-            <p className="text-sm font-bold truncate text-primary">{profile?.fullName || user.email}</p>
+            <p className="text-sm font-bold truncate text-primary">{profile?.fullName || user?.email}</p>
             <Badge variant="outline" className="mt-2 text-[8px] h-4 uppercase border-accent text-accent">
               {profile?.role}
             </Badge>

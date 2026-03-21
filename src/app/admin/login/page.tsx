@@ -39,20 +39,17 @@ export default function AdminLogin() {
       
       setIsVerifying(true);
       try {
-        // Try looking up profile by UID
         const userDocRef = doc(firestore, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
         
         let profile = userSnap.exists() ? userSnap.data() : null;
 
-        // Fallback: Search for profile by institutional email if UID lookup failed
         if (!profile && user.email) {
           const q = query(collection(firestore, 'users'), where('institutionalEmail', '==', user.email));
           const querySnap = await getDocs(q);
           if (!querySnap.empty) {
             const foundDoc = querySnap.docs[0];
             profile = foundDoc.data();
-            // Automatically link the UID to this profile
             await updateDoc(doc(firestore, 'users', foundDoc.id), {
               id: user.uid,
               updatedAt: serverTimestamp()
@@ -68,7 +65,7 @@ export default function AdminLogin() {
             setAuthError(`Access Denied: Your profile role is "${profile.role}". Administrative access required.`);
           }
         } else {
-          setAuthError(`Profile not found for ${user.email}. Please ensure your account has been pre-registered by a system admin.`);
+          setAuthError(`Profile not found for ${user.email}. Ensure your account is pre-registered.`);
         }
       } catch (err: any) {
         setAuthError(err.message);
@@ -89,18 +86,13 @@ export default function AdminLogin() {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ 
       prompt: 'select_account',
-      hd: 'neu.edu.ph' // Enforce NEU domain if possible
+      hd: 'neu.edu.ph'
     });
 
     try {
       await signInWithPopup(auth, provider);
     } catch (error: any) {
-      console.error("Auth error:", error);
-      if (error.code === 'auth/popup-closed-by-user') {
-        // Silently handle popup closed
-      } else if (error.code === 'auth/invalid-credential') {
-        setAuthError("Auth Error: Invalid Credential. Ensure Port 6000 is authorized in Firebase Console.");
-      } else {
+      if (error.code !== 'auth/popup-closed-by-user') {
         setAuthError(error.message);
       }
       setIsGoogleLoading(false);
@@ -222,7 +214,6 @@ export default function AdminLogin() {
           </Tabs>
         </div>
         
-        {/* Domain Diagnostic Tool */}
         <div className="mt-8 p-6 bg-secondary/50 border rounded-2xl space-y-4">
           <div className="flex items-center gap-2 text-primary">
             <Info className="w-4 h-4" />
@@ -234,7 +225,7 @@ export default function AdminLogin() {
               {currentOrigin}
             </code>
             <p className="text-[9px] text-muted-foreground leading-relaxed italic">
-              Verify this domain is in your Authorized Domains in the Firebase Console (Authentication {'>'} Settings).
+              Ensure this domain is added to <strong>Authorized Domains</strong> in your Firebase Console (Authentication {'>'} Settings).
             </p>
           </div>
           <Button variant="ghost" size="sm" className="w-full text-[10px] font-bold h-7 gap-2" asChild>
