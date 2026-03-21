@@ -1,7 +1,7 @@
 
 'use client';
     
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   DocumentReference,
   onSnapshot,
@@ -28,16 +28,6 @@ export interface UseDocResult<T> {
 /**
  * React hook to subscribe to a single Firestore document in real-time.
  * Handles nullable references.
- * 
- * IMPORTANT! YOU MUST MEMOIZE the inputted memoizedDocRef or BAD THINGS WILL HAPPEN
- * use useMemo to memoize it per React guidence.  Also make sure that it's dependencies are stable
- * references
- *
- *
- * @template T Optional type for document data. Defaults to any.
- * @param {DocumentReference<DocumentData> | null | undefined} memoizedDocRef -
- * The Firestore DocumentReference. Waits if null/undefined.
- * @returns {UseDocResult<T>} Object with data, isLoading, error.
  */
 export function useDoc<T = any>(
   memoizedDocRef: DocumentReference<DocumentData> | null | undefined,
@@ -45,19 +35,29 @@ export function useDoc<T = any>(
   type StateDataType = WithId<T> | null;
 
   const [data, setData] = useState<StateDataType>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  // Default to true if we have a ref to fetch, false if we don't.
+  const [isLoading, setIsLoading] = useState<boolean>(!!memoizedTargetRef);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
+  // Use a ref to track if we've initialized for the current memoizedDocRef
+  const lastRefPath = useRef<string | null>(null);
+
   useEffect(() => {
+    const currentPath = memoizedDocRef?.path || null;
+    
     if (!memoizedDocRef) {
       setData(null);
       setIsLoading(false);
       setError(null);
+      lastRefPath.current = null;
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
+    // If the path changed, reset loading state immediately
+    if (currentPath !== lastRefPath.current) {
+      setIsLoading(true);
+      lastRefPath.current = currentPath;
+    }
 
     const unsubscribe = onSnapshot(
       memoizedDocRef,

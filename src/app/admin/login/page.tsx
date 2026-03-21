@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -47,7 +48,7 @@ export default function AdminLogin() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
   useEffect(() => {
-    // Only attempt auto-redirect if loading is fully complete
+    // Wait for everything to settle before redirecting to dashboard.
     if (!isUserLoading && user && !isProfileLoading) {
       const role = userProfile?.role;
       const isAdmin = role === 'Admin' || role === 'Librarian';
@@ -134,6 +135,7 @@ export default function AdminLogin() {
             <p className="text-muted-foreground italic">New Era University Library</p>
           </div>
 
+          {/* Diagnostic Info */}
           <div className="mb-6 p-4 bg-secondary/50 rounded-2xl border border-primary/10 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">

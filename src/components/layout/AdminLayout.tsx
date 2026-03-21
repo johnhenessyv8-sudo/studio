@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect } from 'react';
@@ -34,16 +35,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
-  // Critical Loading Check: Only make a decision once loading has completely stopped
+  // We are "syncing" if auth is loading OR if we have a user but their profile is still loading.
   const isSyncing = isUserLoading || (!!user && isProfileLoading);
   
   const role = userProfile?.role;
   const isAdmin = role === 'Admin' || role === 'Librarian';
 
   useEffect(() => {
+    // Only make a routing decision when loading is complete.
     if (!isSyncing) {
       if (!user || !isAdmin) {
-        // Redirect back to login if not authorized
         router.replace('/admin/login');
       }
     }
@@ -63,8 +64,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-        <h2 className="text-xl font-bold font-headline">Authorizing Access</h2>
-        <p className="text-muted-foreground mt-2 italic">Syncing Firestore Profile...</p>
+        <h2 className="text-xl font-bold font-headline">Checking Authorization</h2>
+        <p className="text-muted-foreground mt-2 italic">Verifying your role...</p>
       </div>
     );
   }
