@@ -12,7 +12,8 @@ import {
   UserPlus,
   Mail,
   User as UserIcon,
-  BookOpen
+  BookOpen,
+  ChevronDown
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -40,12 +41,11 @@ import { collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AccountManagement() {
-  const { firestore } = useFirestore();
+  const firestore = useFirestore();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  // Form State
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -75,8 +75,6 @@ export default function AccountManagement() {
     }
 
     try {
-      // Note: In a real production app, you might want to use a Firebase Admin SDK or Cloud Function 
-      // to create the Auth user too. For this prototype, we'll create the Firestore record.
       const userId = formData.idNumber || `user-${Date.now()}`;
       const userRef = doc(firestore, 'users', userId);
       
@@ -340,24 +338,4 @@ export default function AccountManagement() {
       </div>
     </AdminLayout>
   );
-}
-
-function ChevronDown({ className, ...props }: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  )
 }

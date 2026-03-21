@@ -21,7 +21,7 @@ const PURPOSES = [
 ];
 
 export default function VisitorCheckIn() {
-  const { firestore } = useFirestore();
+  const firestore = useFirestore();
   const { toast } = useToast();
 
   const [email, setEmail] = useState('');

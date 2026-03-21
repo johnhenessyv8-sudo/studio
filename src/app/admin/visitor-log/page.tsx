@@ -26,7 +26,7 @@ import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { format } from 'date-fns';
 
 export default function VisitorLogPage() {
-  const { firestore } = useFirestore();
+  const firestore = useFirestore();
   const [searchTerm, setSearchTerm] = useState('');
 
   const visitsQuery = useMemoFirebase(() => {

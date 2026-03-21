@@ -16,7 +16,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function AdminLogin() {
-  const { auth, firestore } = useAuth();
+  const auth = useAuth();
+  const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
@@ -51,14 +52,12 @@ export default function AdminLogin() {
     
     setIsGoogleLoading(true);
     const provider = new GoogleAuthProvider();
-    // Prompt the user to select an account to ensure clarity
     provider.setCustomParameters({ prompt: 'select_account' });
 
     try {
       const result = await signInWithPopup(auth, provider);
       const loggedUser = result.user;
 
-      // Sync user profile to Firestore users collection for institutional accounts
       if (loggedUser.email?.endsWith('@neu.edu.ph')) {
         const userRef = doc(firestore, 'users', loggedUser.uid);
         setDoc(userRef, {
@@ -75,7 +74,6 @@ export default function AdminLogin() {
         description: `Welcome, ${loggedUser.displayName}!`
       });
     } catch (error: any) {
-      // Don't show error if user just closed the popup
       if (error.code !== 'auth/popup-closed-by-user') {
         toast({
           variant: "destructive",

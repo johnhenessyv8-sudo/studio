@@ -22,9 +22,9 @@ import { signOut } from 'firebase/auth';
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { auth } = useAuth();
+  const auth = useAuth();
   const { user, isUserLoading } = useUser();
-  const { firestore } = useFirestore();
+  const firestore = useFirestore();
   const logo = PlaceHolderImages.find(img => img.id === 'neu-logo');
 
   const adminRoleRef = useMemoFirebase(() => {
