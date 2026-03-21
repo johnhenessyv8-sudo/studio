@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -43,21 +42,20 @@ export default function AdminLogin() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
   useEffect(() => {
-    // Wait for all auth and profile data to be ready before deciding to redirect
+    // Only proceed once we are absolutely sure the profile data is definitively loaded
     if (!isUserLoading && user && !isProfileLoading) {
       const role = userProfile?.role;
       const isAdmin = role === 'Admin' || role === 'Librarian';
       
       if (isAdmin) {
-        // Use replace to prevent back-button loops
+        // Redirect to dashboard if they are already authorized
         router.replace('/admin/dashboard');
+      } else if (userProfile) {
+        // Profile exists but role is missing or incorrect
+        setAuthError(`Access Denied. Your role is currently "${role || 'None'}". Admins only.`);
       } else {
-        // Authenticated but NOT an admin
-        const msg = role 
-          ? `Access Denied. Your current role is "${role}". Admins only.` 
-          : `Access Denied. Your account (UID: ${user.uid}) is missing the "role" field in Firestore. Please add role: "Admin" to your document.`;
-        
-        setAuthError(msg);
+        // Profile doesn't exist yet
+        setAuthError(`Access Denied. Your profile (UID: ${user.uid}) was not found or is still syncing. Please add role: "Admin" to your Firestore document.`);
       }
     }
   }, [user, isUserLoading, userProfile, isProfileLoading, router]);

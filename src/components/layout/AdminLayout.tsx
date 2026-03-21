@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect } from 'react';
@@ -39,13 +38,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isAdmin = role === 'Admin' || role === 'Librarian';
 
   useEffect(() => {
-    // Only handle redirects once we are definitely finished loading auth and profile
+    // Wait for everything to be ready before deciding to redirect
     if (!isUserLoading) {
       if (!user) {
-        // Not logged in -> Go to login
+        // Definitely not logged in
         router.replace('/admin/login');
       } else if (!isProfileLoading) {
-        // Logged in but not an authorized role -> Go to login (which will show error)
+        // Definitely loaded, check if authorized
         if (!isAdmin) {
           router.replace('/admin/login');
         }
@@ -63,7 +62,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   };
 
-  // While loading OR while about to redirect, show a clean loader
+  // Show a clean loader while determining auth/admin state
   if (isUserLoading || (user && isProfileLoading) || (user && !isProfileLoading && !isAdmin)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -75,7 +74,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  // Final check before rendering children
+  // Prevent UI flashing if not authorized
   if (!user || !isAdmin) {
     return null;
   }
