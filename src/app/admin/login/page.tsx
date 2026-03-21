@@ -47,8 +47,7 @@ export default function AdminLogin() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
   useEffect(() => {
-    // Wait for everything to settle before redirecting to dashboard.
-    // We only redirect if we have a user AND their profile is loaded AND they are an admin.
+    // Only redirect if everything is loaded and the role is confirmed.
     if (!isUserLoading && user && !isProfileLoading) {
       const role = userProfile?.role;
       const isAdmin = role === 'Admin' || role === 'Librarian';
@@ -56,9 +55,8 @@ export default function AdminLogin() {
       if (isAdmin) {
         router.replace('/admin/dashboard');
       } else if (userProfile) {
-        setAuthError(`Access Denied. Your profile exists, but your role is "${role || 'None'}". Authorized roles: "Admin", "Librarian".`);
+        setAuthError(`Access Denied. Your role is "${role || 'None'}". Authorized roles: "Admin", "Librarian".`);
       } else {
-        // If profile is missing but user is logged in, show an error.
         setAuthError(`Profile Not Found. No Firestore document found for UID "${user.uid}" in the 'users' collection.`);
       }
     }
@@ -147,7 +145,7 @@ export default function AdminLogin() {
               {currentOrigin || 'Detecting...'}
             </code>
             <p className="text-[9px] text-muted-foreground leading-relaxed italic">
-              Ensure this hostname is in <strong>Authorized Domains</strong> in Firebase Console (Authentication &gt; Settings).
+              Ensure cloudworkstations.dev is in <strong>Authorized Domains</strong> in Firebase Console (Authentication &gt; Settings).
             </p>
           </div>
 
