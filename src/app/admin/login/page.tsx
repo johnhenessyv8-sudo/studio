@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { ArrowLeft, ShieldCheck, Chrome, Mail, Lock, Copy, Check } from 'lucide-react';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
-import { doc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -46,10 +46,28 @@ export default function AdminLogin() {
   }, [user, isUserLoading, isAdminLoading, isLibrarianLoading, adminRole, librarianRole, router]);
 
   const handleGoogleLogin = async () => {
-    if (!auth) return;
+    if (!auth || !firestore) return;
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const loggedUser = result.user;
+
+      // Sync user profile to Firestore users collection
+      if (loggedUser.email?.endsWith('@neu.edu.ph')) {
+        const userRef = doc(firestore, 'users', loggedUser.uid);
+        await setDoc(userRef, {
+          id: loggedUser.uid,
+          fullName: loggedUser.displayName,
+          institutionalEmail: loggedUser.email,
+          isActive: true,
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      }
+
+      toast({
+        title: "Signed in successfully",
+        description: `Welcome, ${loggedUser.displayName}!`
+      });
     } catch (error: any) {
       toast({
         variant: "destructive",
