@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { 
   Search, 
@@ -22,24 +22,76 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, orderBy, limit } from 'firebase/firestore';
-import { format } from 'date-fns';
+import { format, isToday, isWithinInterval, subDays, startOfDay } from 'date-fns';
 
 export default function VisitorLogPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Filtering State
+  const [filterPurpose, setFilterPurpose] = useState<string>('all');
+  const [filterDate, setFilterDate] = useState<string>('all');
 
   const visitsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    return query(collection(firestore, 'visits'), orderBy('entryTime', 'desc'), limit(100));
+    return query(collection(firestore, 'visits'), orderBy('entryTime', 'desc'), limit(200));
   }, [firestore, user]);
 
   const { data: visits, isLoading } = useCollection(visitsQuery);
 
-  const filteredVisits = visits?.filter(visit => 
-    visit.visitorEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    visit.purpose?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredVisits = useMemo(() => {
+    if (!visits) return [];
+    
+    let result = visits.filter(visit => 
+      visit.visitorEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      visit.purpose?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    if (filterPurpose !== 'all') {
+      result = result.filter(v => v.purpose === filterPurpose);
+    }
+
+    if (filterDate !== 'all') {
+      const now = new Date();
+      result = result.filter(v => {
+        const entryTime = v.entryTime?.toDate ? v.entryTime.toDate() : new Date(v.entryTime);
+        if (filterDate === 'today') return isToday(entryTime);
+        if (filterDate === 'week') {
+          return isWithinInterval(entryTime, {
+            start: startOfDay(subDays(now, 7)),
+            end: now
+          });
+        }
+        return true;
+      });
+    }
+
+    return result;
+  }, [visits, searchTerm, filterPurpose, filterDate]);
+
+  const exportToCSV = () => {
+    if (!filteredVisits || filteredVisits.length === 0) return;
+    
+    const headers = ["Visitor Email", "Purpose", "Entry Time", "Status"];
+    const rows = filteredVisits.map(v => [
+      v.visitorEmail,
+      v.purpose,
+      v.entryTime?.toDate ? format(v.entryTime.toDate(), 'PPP p') : 'Pending',
+      "Checked In"
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `NEU_Visitor_Logs_${new Date().toLocaleDateString()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <AdminLayout>
@@ -51,9 +103,9 @@ export default function VisitorLogPage() {
           </div>
           <div className="flex items-center gap-3">
             <Badge className="bg-primary/20 text-primary border-primary h-10 px-4 text-sm font-bold">
-              Total Recorded: {visits?.length || 0}
+              Results Found: {filteredVisits.length}
             </Badge>
-            <Button variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white">
+            <Button onClick={exportToCSV} variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white">
               <FileDown className="mr-2 w-4 h-4" /> Export Latest
             </Button>
           </div>
@@ -74,30 +126,30 @@ export default function VisitorLogPage() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="h-11 justify-between">
-                <span className="flex items-center"><Filter className="mr-2 w-4 h-4 text-primary" /> All Purposes</span>
+                <span className="flex items-center"><Filter className="mr-2 w-4 h-4 text-primary" /> {filterPurpose === 'all' ? 'All Purposes' : filterPurpose}</span>
                 <ChevronDown className="w-4 h-4 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56">
-              <DropdownMenuItem>All Purposes</DropdownMenuItem>
-              <DropdownMenuItem>Researching</DropdownMenuItem>
-              <DropdownMenuItem>Assignment</DropdownMenuItem>
-              <DropdownMenuItem>Reading</DropdownMenuItem>
-              <DropdownMenuItem>Use of Computer</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterPurpose('all')}>All Purposes</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterPurpose('Researching')}>Researching</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterPurpose('Assignment')}>Assignment</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterPurpose('Reading')}>Reading</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterPurpose('Use of Computer')}>Use of Computer</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="h-11 justify-between">
-                <span className="flex items-center"><Calendar className="mr-2 w-4 h-4 text-accent" /> Date Filter</span>
+                <span className="flex items-center"><Calendar className="mr-2 w-4 h-4 text-accent" /> {filterDate === 'all' ? 'All Time' : filterDate === 'today' ? 'Today' : 'Last 7 Days'}</span>
                 <ChevronDown className="w-4 h-4 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56">
-              <DropdownMenuItem>Today</DropdownMenuItem>
-              <DropdownMenuItem>Last 7 Days</DropdownMenuItem>
-              <DropdownMenuItem>All Time</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterDate('today')}>Today</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterDate('week')}>Last 7 Days</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterDate('all')}>All Time</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -123,14 +175,14 @@ export default function VisitorLogPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : filteredVisits?.length === 0 ? (
+              ) : filteredVisits.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center py-20 text-muted-foreground">
                     No visit records found.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredVisits?.map((visit) => (
+                filteredVisits.map((visit) => (
                   <TableRow key={visit.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">

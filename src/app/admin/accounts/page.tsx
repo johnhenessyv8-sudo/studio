@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { 
   Search, 
@@ -16,7 +16,7 @@ import {
   Loader2,
   MoreVertical,
   Edit2,
-  CheckCircle2,
+  FileDown,
   Key
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -58,6 +58,11 @@ export default function AccountManagement() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
+  
+  // Sorting and Filtering State
+  const [sortBy, setSortBy] = useState<string>('name-asc');
+  const [filterCollege, setFilterCollege] = useState<string>('all');
+  const [filterRole, setFilterRole] = useState<string>('all');
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -213,11 +218,60 @@ export default function AccountManagement() {
       });
   };
 
-  const filteredUsers = users?.filter(u => 
-    u.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.idNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.institutionalEmail?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const exportToCSV = () => {
+    if (!filteredUsers || filteredUsers.length === 0) return;
+    
+    const headers = ["Full Name", "Email", "ID Number", "College", "Role", "Status"];
+    const rows = filteredUsers.map(u => [
+      u.fullName,
+      u.institutionalEmail,
+      u.idNumber || u.id,
+      u.college || "N/A",
+      u.role,
+      u.isActive ? "Active" : "Blocked"
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `NEU_Library_Users_${new Date().toLocaleDateString()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const filteredUsers = useMemo(() => {
+    if (!users) return [];
+    
+    let result = users.filter(u => 
+      u.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.idNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.institutionalEmail?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    if (filterCollege !== 'all') {
+      result = result.filter(u => u.college === filterCollege);
+    }
+
+    if (filterRole !== 'all') {
+      result = result.filter(u => u.role === filterRole);
+    }
+
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'name-asc': return (a.fullName || '').localeCompare(b.fullName || '');
+        case 'name-desc': return (b.fullName || '').localeCompare(a.fullName || '');
+        case 'id': return (a.idNumber || '').localeCompare(b.idNumber || '');
+        case 'role': return (a.role || '').localeCompare(b.role || '');
+        default: return 0;
+      }
+    });
+
+    return result;
+  }, [users, searchTerm, sortBy, filterCollege, filterRole]);
 
   return (
     <AdminLayout>
@@ -228,9 +282,9 @@ export default function AccountManagement() {
             <p className="text-muted-foreground">Manage library user permissions and profiles.</p>
           </div>
           <div className="flex items-center gap-3">
-            <Badge className="bg-primary/20 text-primary border-primary h-10 px-4 text-sm font-bold">
-              Total Users: {users?.length || 0}
-            </Badge>
+            <Button variant="outline" onClick={exportToCSV} className="border-primary text-primary hover:bg-primary/10">
+              <FileDown className="mr-2 w-4 h-4" /> Export Users
+            </Button>
             
             <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
               <DialogTrigger asChild>
@@ -357,17 +411,17 @@ export default function AccountManagement() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="h-11 justify-between">
-                <span className="flex items-center"><Filter className="mr-2 w-4 h-4 text-primary" /> College</span>
+                <span className="flex items-center"><Filter className="mr-2 w-4 h-4 text-primary" /> {filterCollege === 'all' ? 'All Colleges' : filterCollege}</span>
                 <ChevronDown className="w-4 h-4 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56">
-              <DropdownMenuItem onClick={() => setSearchTerm('')}>All Colleges</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSearchTerm('CICS')}>CICS</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSearchTerm('Engineering')}>Engineering</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSearchTerm('Nursing')}>Nursing</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSearchTerm('Education')}>Education</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSearchTerm('Business')}>Business</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterCollege('all')}>All Colleges</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterCollege('CICS')}>CICS</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterCollege('Engineering')}>Engineering</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterCollege('Nursing')}>Nursing</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterCollege('Education')}>Education</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterCollege('Business')}>Business</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -379,25 +433,25 @@ export default function AccountManagement() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56">
-              <DropdownMenuItem>Name (A-Z)</DropdownMenuItem>
-              <DropdownMenuItem>Name (Z-A)</DropdownMenuItem>
-              <DropdownMenuItem>ID Number</DropdownMenuItem>
-              <DropdownMenuItem>Type</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSortBy('name-asc')}>Name (A-Z)</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSortBy('name-desc')}>Name (Z-A)</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSortBy('id')}>ID Number</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSortBy('role')}>Role</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="h-11 justify-between">
-                <span className="flex items-center"><Filter className="mr-2 w-4 h-4 text-primary" /> Type</span>
+                <span className="flex items-center"><Filter className="mr-2 w-4 h-4 text-primary" /> {filterRole === 'all' ? 'All Roles' : filterRole}</span>
                 <ChevronDown className="w-4 h-4 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56">
-              <DropdownMenuItem onClick={() => setSearchTerm('')}>All Types</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSearchTerm('Student')}>Student</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSearchTerm('Librarian')}>Librarian</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSearchTerm('Admin')}>Admin</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterRole('all')}>All Roles</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterRole('Student')}>Student</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterRole('Librarian')}>Librarian</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterRole('Admin')}>Admin</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -420,12 +474,12 @@ export default function AccountManagement() {
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-10">Loading users...</TableCell>
                 </TableRow>
-              ) : filteredUsers?.length === 0 ? (
+              ) : filteredUsers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-10">No users found.</TableCell>
                 </TableRow>
               ) : (
-                filteredUsers?.map((u) => (
+                filteredUsers.map((u) => (
                   <TableRow key={u.id}>
                     <TableCell className="font-mono text-xs">{u.idNumber || u.id}</TableCell>
                     <TableCell className="font-bold text-primary">{u.fullName}</TableCell>
