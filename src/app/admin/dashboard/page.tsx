@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo } from 'react';
@@ -29,7 +28,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
-import { format, startOfWeek, startOfMonth } from 'date-fns';
+import { startOfWeek, startOfMonth, format } from 'date-fns';
 
 export default function Dashboard() {
   const firestore = useFirestore();

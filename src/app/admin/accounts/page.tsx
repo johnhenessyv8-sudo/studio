@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react';
@@ -13,7 +12,8 @@ import {
   Mail,
   User as UserIcon,
   BookOpen,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -39,12 +39,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, doc, serverTimestamp, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { firebaseConfig } from '@/firebase/config';
 
 export default function AccountManagement() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -61,9 +65,9 @@ export default function AccountManagement() {
 
   const { data: users, isLoading } = useCollection(usersRef);
 
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firestore) return;
+    if (!firestore || isSaving) return;
 
     if (!formData.email.endsWith('@neu.edu.ph')) {
       toast({
@@ -74,37 +78,54 @@ export default function AccountManagement() {
       return;
     }
 
-    const userId = formData.idNumber || `user-${Date.now()}`;
-    const userRef = doc(firestore, 'users', userId);
-    const data = {
-      id: userId,
-      fullName: formData.fullName,
-      institutionalEmail: formData.email.toLowerCase(),
-      idNumber: formData.idNumber,
-      college: formData.college,
-      role: formData.role,
-      isActive: true,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
+    setIsSaving(true);
 
-    setDoc(userRef, data)
-      .then(() => {
-        toast({
-          title: "User Added",
-          description: `${formData.fullName} has been added successfully.`
-        });
-        setIsDialogOpen(false);
-        setFormData({ fullName: '', email: '', idNumber: '', college: '', role: 'Student' });
-      })
-      .catch(async (error: any) => {
-        const permissionError = new FirestorePermissionError({
-          path: userRef.path,
-          operation: 'create',
-          requestResourceData: data,
-        });
-        errorEmitter.emit('permission-error', permissionError);
+    try {
+      // 1. Create Auth Account with default password 'mypassword123'
+      // We use a secondary Firebase instance to avoid logging out the current admin
+      const secondaryApp = initializeApp(firebaseConfig, `secondary-${Date.now()}`);
+      const secondaryAuth = getAuth(secondaryApp);
+      
+      const authUser = await createUserWithEmailAndPassword(secondaryAuth, formData.email.toLowerCase(), "mypassword123");
+      const uid = authUser.user.uid;
+
+      // Clean up secondary instance immediately
+      await signOut(secondaryAuth);
+      await deleteApp(secondaryApp);
+
+      // 2. Create Firestore Profile
+      const userRef = doc(firestore, 'users', uid);
+      const data = {
+        id: uid,
+        fullName: formData.fullName,
+        institutionalEmail: formData.email.toLowerCase(),
+        idNumber: formData.idNumber,
+        college: formData.college,
+        role: formData.role,
+        isActive: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      await setDoc(userRef, data);
+
+      toast({
+        title: "User Created",
+        description: `${formData.fullName} added with password: mypassword123`
       });
+      
+      setIsDialogOpen(false);
+      setFormData({ fullName: '', email: '', idNumber: '', college: '', role: 'Student' });
+    } catch (error: any) {
+      console.error("User creation error:", error);
+      toast({
+        variant: "destructive",
+        title: "Creation Failed",
+        description: error.message || "Ensure the email isn't already in use."
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleToggleActive = (user: any) => {
@@ -166,7 +187,7 @@ export default function AccountManagement() {
                 <DialogHeader>
                   <DialogTitle>Add New User</DialogTitle>
                   <DialogDescription>
-                    Create a new profile for a student or staff member.
+                    Account will be created with default password: <b>mypassword123</b>
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleAddUser} className="space-y-4 py-4">
@@ -181,6 +202,7 @@ export default function AccountManagement() {
                         value={formData.fullName}
                         onChange={(e) => setFormData({...formData, fullName: e.target.value})}
                         required
+                        disabled={isSaving}
                       />
                     </div>
                   </div>
@@ -196,6 +218,7 @@ export default function AccountManagement() {
                         value={formData.email}
                         onChange={(e) => setFormData({...formData, email: e.target.value})}
                         required
+                        disabled={isSaving}
                       />
                     </div>
                   </div>
@@ -210,13 +233,18 @@ export default function AccountManagement() {
                         value={formData.idNumber}
                         onChange={(e) => setFormData({...formData, idNumber: e.target.value})}
                         required
+                        disabled={isSaving}
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="college">College</Label>
-                      <Select value={formData.college} onValueChange={(val) => setFormData({...formData, college: val})}>
+                      <Select 
+                        value={formData.college} 
+                        onValueChange={(val) => setFormData({...formData, college: val})}
+                        disabled={isSaving}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
@@ -231,7 +259,11 @@ export default function AccountManagement() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="role">Role</Label>
-                      <Select value={formData.role} onValueChange={(val) => setFormData({...formData, role: val})}>
+                      <Select 
+                        value={formData.role} 
+                        onValueChange={(val) => setFormData({...formData, role: val})}
+                        disabled={isSaving}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
@@ -244,7 +276,10 @@ export default function AccountManagement() {
                     </div>
                   </div>
                   <DialogFooter className="pt-4">
-                    <Button type="submit" className="w-full">Save User Profile</Button>
+                    <Button type="submit" className="w-full" disabled={isSaving}>
+                      {isSaving ? <Loader2 className="animate-spin mr-2" /> : null}
+                      {isSaving ? "Creating User..." : "Save User Profile"}
+                    </Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
@@ -272,12 +307,12 @@ export default function AccountManagement() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56">
-              <DropdownMenuItem>All Colleges</DropdownMenuItem>
-              <DropdownMenuItem>CICS</DropdownMenuItem>
-              <DropdownMenuItem>Engineering</DropdownMenuItem>
-              <DropdownMenuItem>Nursing</DropdownMenuItem>
-              <DropdownMenuItem>Education</DropdownMenuItem>
-              <DropdownMenuItem>Business</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSearchTerm('')}>All Colleges</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSearchTerm('CICS')}>CICS</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSearchTerm('Engineering')}>Engineering</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSearchTerm('Nursing')}>Nursing</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSearchTerm('Education')}>Education</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSearchTerm('Business')}>Business</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -304,10 +339,10 @@ export default function AccountManagement() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56">
-              <DropdownMenuItem>All Types</DropdownMenuItem>
-              <DropdownMenuItem>Student</DropdownMenuItem>
-              <DropdownMenuItem>Librarian</DropdownMenuItem>
-              <DropdownMenuItem>Admin</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSearchTerm('')}>All Types</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSearchTerm('Student')}>Student</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSearchTerm('Librarian')}>Librarian</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSearchTerm('Admin')}>Admin</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
