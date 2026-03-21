@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, ShieldCheck, Chrome, Mail, Lock, Copy, Check } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Chrome, Mail, Lock, Copy, Check, Loader2 } from 'lucide-react';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -24,6 +24,7 @@ export default function AdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const adminRoleRef = useMemoFirebase(() => {
@@ -47,15 +48,20 @@ export default function AdminLogin() {
 
   const handleGoogleLogin = async () => {
     if (!auth || !firestore) return;
+    
+    setIsGoogleLoading(true);
     const provider = new GoogleAuthProvider();
+    // Prompt the user to select an account to ensure clarity
+    provider.setCustomParameters({ prompt: 'select_account' });
+
     try {
       const result = await signInWithPopup(auth, provider);
       const loggedUser = result.user;
 
-      // Sync user profile to Firestore users collection
+      // Sync user profile to Firestore users collection for institutional accounts
       if (loggedUser.email?.endsWith('@neu.edu.ph')) {
         const userRef = doc(firestore, 'users', loggedUser.uid);
-        await setDoc(userRef, {
+        setDoc(userRef, {
           id: loggedUser.uid,
           fullName: loggedUser.displayName,
           institutionalEmail: loggedUser.email,
@@ -69,11 +75,16 @@ export default function AdminLogin() {
         description: `Welcome, ${loggedUser.displayName}!`
       });
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Login failed",
-        description: error.message
-      });
+      // Don't show error if user just closed the popup
+      if (error.code !== 'auth/popup-closed-by-user') {
+        toast({
+          variant: "destructive",
+          title: "Login failed",
+          description: error.message
+        });
+      }
+    } finally {
+      setIsGoogleLoading(false);
     }
   };
 
@@ -135,9 +146,14 @@ export default function AdminLogin() {
               <Button 
                 onClick={handleGoogleLogin}
                 className="w-full h-12 font-bold text-lg"
-                disabled={isUserLoading}
+                disabled={isUserLoading || isGoogleLoading}
               >
-                <Chrome className="mr-2 w-5 h-5" /> Login with Google
+                {isGoogleLoading ? (
+                  <Loader2 className="mr-2 w-5 h-5 animate-spin" />
+                ) : (
+                  <Chrome className="mr-2 w-5 h-5" />
+                )}
+                {isGoogleLoading ? "Connecting..." : "Login with Google"}
               </Button>
             </TabsContent>
 
@@ -176,7 +192,7 @@ export default function AdminLogin() {
                 <Button 
                   type="submit" 
                   className="w-full h-12 font-bold text-lg"
-                  disabled={isSubmitting || isUserLoading}
+                  disabled={isSubmitting || isUserLoading || isGoogleLoading}
                 >
                   {isSubmitting ? "Logging in..." : "Login"}
                 </Button>
@@ -187,14 +203,14 @@ export default function AdminLogin() {
           {user && !adminRole && !librarianRole && !isUserLoading && !isAdminLoading && !isLibrarianLoading && (
             <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-2">
               <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive">
-                <AlertTitle className="font-bold">Access Denied</AlertTitle>
-                <AlertDescription>
+                <AlertTitle className="font-bold text-sm">Access Denied</AlertTitle>
+                <AlertDescription className="text-xs">
                   You are signed in but do not have administrator or librarian privileges.
                 </AlertDescription>
               </Alert>
               
               <div className="p-4 bg-secondary/50 rounded-xl border border-primary/10">
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Your User ID (UID)</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Your User ID (UID)</p>
                 <div className="flex items-center justify-between gap-2">
                   <code className="text-xs font-mono bg-background px-2 py-1 rounded border overflow-x-auto whitespace-nowrap flex-1">
                     {user.uid}
@@ -203,8 +219,8 @@ export default function AdminLogin() {
                     {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                   </Button>
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-2 leading-tight">
-                  Copy this UID and add it to the <code className="text-primary font-bold">roles_admin</code> collection in the Firebase Console to grant yourself access.
+                <p className="text-[9px] text-muted-foreground mt-2 leading-tight">
+                  To appear in the console, sign in with Google once. Then copy this UID and add it to the <code className="text-primary font-bold">roles_admin</code> collection in Firestore.
                 </p>
               </div>
             </div>
