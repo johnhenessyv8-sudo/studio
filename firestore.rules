@@ -1,0 +1,126 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * NEU Library Visit Log Security Rules
+     *
+     * CORE PHILOSOPHY:
+     * This ruleset implements a Database-Backed Access Control (DBAC) model using the "Existence over Content" 
+     * pattern for roles. It prioritizes institutional security by restricting administrative actions to 
+     * verified NEU accounts and authorized roles (Admins/Librarians).
+     *
+     * DATA STRUCTURE:
+     * - /users/{userId}: Profiles for students, faculty, and staff.
+     * - /roles_admin/{userId}: Existence of a document here grants administrative privileges.
+     * - /roles_librarian/{userId}: Existence of a document here grants librarian privileges.
+     * - /visits/{visitId}: Immutable records of library check-ins.
+     *
+     * KEY SECURITY DECISIONS:
+     * 1. ROLE ISOLATION: Roles are managed via dedicated collections (/roles_admin, /roles_librarian) 
+     *    to avoid slow profile lookups and ensure atomic authorization checks.
+     * 2. ACCESS RESTRICTION: Visit logs are strictly restricted to staff (Admins/Librarians) for 
+     *    privacy, while users can only see their own profile.
+     * 3. NEU AUTHENTICATION: Accountability is enforced by ensuring users can only create 
+     *    records linked to their own verified UID.
+     * 4. IMMUTABILITY: Visit records are write-once to prevent tampering with historical logs.
+     *
+     * DENORMALIZATION FOR AUTHORIZATION:
+     * - 'visitorId' is denormalized into the 'Visit' document to allow immediate ownership 
+     *   validation without cross-document lookups.
+     */
+
+    // --- Global Helper Functions ---
+
+    /** Checks if the requester is authenticated. */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /** Checks if the requester is a member of the NEU domain via Google Auth. */
+    function isNEUEmail() {
+      // Fixed: Replaced endsWith with matches for string suffix check
+      return isSignedIn() && request.auth.token.email.matches('.*@neu.edu.ph');
+    }
+
+    /** Checks if the requester's UID matches the provided ID. */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /** 
+     * Checks if the user is an Admin by looking for a document in the roles_admin collection. 
+     * This is highly performant and secure.
+     */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /** Checks if the user is a Librarian. */
+    function isLibrarian() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_librarian/$(request.auth.uid));
+    }
+
+    // Removed the unused function isExistingOwner to resolve associated warnings.
+
+    // --- Collection Rules ---
+
+    /**
+     * @description Rules for the User collection. Handles profile management and account registration.
+     * @path /users/{userId}
+     * @allow get: If the user is viewing their own profile or is an Admin.
+     * @allow create: If the user is an Admin or a valid NEU account creating their own profile.
+     * @deny update: If the requester is not an Admin or the profile owner.
+     * @principle Restricts profile access to owners and enforces institutional account creation.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if (isAdmin() || (isNEUEmail() && isOwner(userId))) && request.resource.data.id == userId;
+      allow update: if (isAdmin() || isOwner(userId)) && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Administrative role assignments.
+     * @path /roles_admin/{userId}
+     * @allow get: If the user is signed in (to verify their own or others' status).
+     * @allow write: Only if the requester is already an Admin.
+     * @principle Existence-based role management restricted to existing administrators.
+     */
+    match /roles_admin/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    /**
+     * @description Librarian role assignments.
+     * @path /roles_librarian/{userId}
+     * @allow get: If the user is signed in.
+     * @allow write: Only if the requester is an Admin.
+     * @principle Administrative control over staff roles.
+     */
+    match /roles_librarian/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin() || isLibrarian();
+      allow create, update, delete: if isAdmin();
+    }
+
+    /**
+     * @description Library visit logs. 
+     * @path /visits/{visitId}
+     * @allow get: If requester is the visitor, an Admin, or a Librarian.
+     * @allow list: Only Admins and Librarians can view the full visit log.
+     * @allow create: Any authenticated NEU user can create a log for themselves.
+     * @deny update/delete: Logs are immutable to maintain record integrity.
+     * @principle Ensures visit data is audit-ready and restricted to authorized personnel.
+     */
+    match /visits/{visitId} {
+      allow get: if isAdmin() || isLibrarian() || isOwner(resource.data.visitorId);
+      allow list: if isAdmin() || isLibrarian();
+      allow create: if isNEUEmail() && request.resource.data.visitorId == request.auth.uid;
+      allow update, delete: if false; 
+    }
+  }
+}

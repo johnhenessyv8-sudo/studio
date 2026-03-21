@@ -1,0 +1,177 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents an individual associated with New Era University (NEU), including students, faculty, employees, librarians, and administrators. This entity stores their institutional details and role within the system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "institutionalEmail": {
+          "type": "string",
+          "description": "The official NEU institutional email address of the user. This is used for login via Google-based authentication and serves as a unique identifier for the user.",
+          "format": "email"
+        },
+        "fullName": {
+          "type": "string",
+          "description": "The full name of the user."
+        },
+        "idNumber": {
+          "type": "string",
+          "description": "The unique identification number assigned by NEU (e.g., student ID, employee ID)."
+        },
+        "college": {
+          "type": "string",
+          "description": "The college or department within NEU that the user is affiliated with (e.g., CICS, Education, Nursing, Arts, Engineering, Business)."
+        },
+        "program": {
+          "type": "string",
+          "description": "The specific academic program or course of study the user is pursuing (e.g., BSIT, BSCS, BSME). This property may be null for faculty, employees, librarians, or administrators not currently enrolled in a program."
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the user within NEU and the application system. This determines their categorization and access privileges.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "A flag indicating whether the user's account is currently active. If 'false', the user is considered blocked and cannot log visits or access administrative features."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "The date and time when this user record was first created in the system.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "The date and time when this user record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "institutionalEmail",
+        "fullName",
+        "idNumber",
+        "role",
+        "isActive",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Visit": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Visit",
+      "type": "object",
+      "description": "Records a single instance of a user visiting the NEU Library, capturing the purpose of their visit and the precise entry time.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Visit entity."
+        },
+        "visitorId": {
+          "type": "string",
+          "description": "Reference to the User entity representing the individual who made this visit. (Relationship: User 1:N Visit)"
+        },
+        "purpose": {
+          "type": "string",
+          "description": "The primary reason or activity for the user's visit to the library.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "entryTime": {
+          "type": "string",
+          "description": "The precise date and time when the user checked into the library.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "visitorId",
+        "purpose",
+        "entryTime"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores individual user profiles, identified by their Firebase Authentication User ID. Contains institutional details and their current status. Users can read their own profiles. Admins have read, create, update, and delete access for account management.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Authentication User ID (UID) of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "A collection where the existence of a document signifies 'admin' privileges for the associated userId. This leverages the 'Existence over Content' pattern for DBAC and Authorization Independence. Only existing admins can create or delete documents in this collection.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Authentication User ID (UID) of the user who holds the 'admin' role."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_librarian/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "A collection where the existence of a document signifies 'librarian' privileges for the associated userId. This leverages the 'Existence over Content' pattern for DBAC and Authorization Independence. Only existing admins can create or delete documents in this collection.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Authentication User ID (UID) of the user who holds the 'librarian' role."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/visits/{visitId}",
+        "definition": {
+          "entityName": "Visit",
+          "schema": {
+            "$ref": "#/backend/entities/Visit"
+          },
+          "description": "Records individual library visits. Includes 'visitorId' which is denormalized from the user's UID to ensure Authorization Independence. Authenticated NEU users can create their own visit records, while administrators and librarians have full read access to all visit logs (supporting QAPs). Visit records are immutable after creation.",
+          "params": [
+            {
+              "name": "visitId",
+              "description": "The unique identifier for a specific library visit."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to be highly secure, scalable, and debuggable by strictly adhering to the core design principles and mandates. Authorization Independence is paramount, achieved primarily through denormalization and the 'Existence over Content' pattern for roles.\n\n1.  **User Profiles (`/users/{userId}`):** This top-level collection stores comprehensive details for each user, identified by their Firebase Authentication `uid`. Users can read their own profiles, while administrators have full read/write access for account management. The 'role' field within these documents is primarily for display and application logic; authorization relies on dedicated role collections.\n\n2.  **Role Collections (`/roles_admin/{userId}`, `/roles_librarian/{userId}`):** These collections implement the 'Existence over Content' pattern for DBAC (Database-Backed Access Control). A document's presence in `/roles_admin/{userId}` or `/roles_librarian/{userId}` explicitly grants 'admin' or 'librarian' privileges, respectively. This is a critical component for Authorization Independence, as security rules can check `exists(/roles_admin/$(request.auth.uid))` instead of making costly and non-atomic `get()` calls to user profiles. Only existing administrators can create or delete documents in these role collections.\n\n3.  **Visitor Logs (`/visits/{visitId}`):** This collection records every library visit. To ensure Authorization Independence, each `Visit` document includes `visitorId`, which is a denormalized copy of the `request.auth.uid` of the user who performed the check-in. This allows security rules to directly verify ownership during creation (`request.resource.data.visitorId == request.auth.uid`) without needing to fetch the user's profile. Visit records are designed to be immutable once created, preserving data integrity. This collection is crucial for QAPs (Query-Based Access Patterns) because administrators and librarians are granted direct `read` access to the entire collection (via their respective role checks). This enables them to perform `list` operations (e.g., retrieve all visits for a dashboard) without the need for security rules to filter results, which is inefficient and insecure. Any authenticated NEU user can create their own visit record.\n\nThis structure segregates data based on security posture (e.g., user profiles vs. visit logs vs. role assignments) and uses consistent naming conventions (`userId`, `visitId`, `ownerId` implicit in `visitorId`). The explicit modeling of roles via dedicated collections and the denormalization of `visitorId` directly into `Visit` documents ensures that security rules are simple, robust, and highly performant, fully supporting the principles of Authorization Independence and QAPs."
+  }
+}
