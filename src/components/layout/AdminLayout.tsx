@@ -42,7 +42,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (!firestore) return;
 
       try {
-        // Step 1: Look for exact UID match in Firestore document IDs
         const userDocRef = doc(firestore, 'users', user.uid);
         const userSnap = await getDoc(userDocRef);
         
@@ -51,7 +50,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (userSnap.exists()) {
           profileData = userSnap.data();
         } else if (user.email) {
-          // Step 2: Fallback to searching for the institutional email field
           const q = query(
             collection(firestore, 'users'), 
             where('institutionalEmail', '==', user.email.toLowerCase())
@@ -62,7 +60,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             const foundDoc = querySnap.docs[0];
             profileData = foundDoc.data();
             
-            // Auto-link: Update the document to use the current UID for faster future lookups
             await updateDoc(foundDoc.ref, {
               id: user.uid,
               updatedAt: serverTimestamp()

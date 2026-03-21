@@ -45,7 +45,7 @@ export default function AdminLogin() {
         
         let profile = userSnap.exists() ? userSnap.data() : null;
 
-        // Attempt 2: Fallback to email search if UID doesn't match a document ID
+        // Attempt 2: Fallback to email search
         if (!profile && user.email) {
           const q = query(
             collection(firestore, 'users'), 
@@ -55,7 +55,7 @@ export default function AdminLogin() {
           if (!querySnap.empty) {
             const foundDoc = querySnap.docs[0];
             profile = foundDoc.data();
-            // Automatically link the UID to this record for future one-step logins
+            // Automatically link UID to this record
             await updateDoc(foundDoc.ref, {
               id: user.uid,
               updatedAt: serverTimestamp()
@@ -71,7 +71,7 @@ export default function AdminLogin() {
             setAuthError(`Access Denied: Your profile role is "${profile.role}". Administrative privileges required.`);
           }
         } else {
-          setAuthError(`No library profile found for ${user.email}. Please ensure your account is pre-registered.`);
+          setAuthError(`No library profile found for ${user.email}. Please ensure your account is pre-registered in the database.`);
         }
       } catch (err: any) {
         setAuthError(err.message);
@@ -114,7 +114,7 @@ export default function AdminLogin() {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {
       if (error.code === 'auth/invalid-credential') {
-        setAuthError("Authentication Failed: The email or password provided is incorrect.");
+        setAuthError("Authentication Failed: The email or password provided is incorrect. Please verify your password in the Firebase Console.");
       } else {
         setAuthError(error.message);
       }
