@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -7,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, ShieldCheck, Chrome, Loader2, AlertCircle, Info } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Chrome, Loader2, AlertCircle, Info, ExternalLink } from 'lucide-react';
 import { useAuth, useUser, useFirestore } from '@/firebase';
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -26,6 +25,13 @@ export default function AdminLogin() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [currentOrigin, setCurrentOrigin] = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setCurrentOrigin(window.location.origin);
+    }
+  }, []);
 
   useEffect(() => {
     async function checkAccess() {
@@ -38,6 +44,7 @@ export default function AdminLogin() {
         
         let profile = userSnap.exists() ? userSnap.data() : null;
 
+        // Fallback: Link by institutional email if manually added
         if (!profile && user.email) {
           const q = query(collection(firestore, 'users'), where('institutionalEmail', '==', user.email));
           const querySnap = await getDocs(q);
@@ -56,10 +63,10 @@ export default function AdminLogin() {
           if (isAdmin) {
             router.replace('/admin/dashboard');
           } else {
-            setAuthError(`Access Denied: Role "${profile.role}" is not authorized for Admin Portal.`);
+            setAuthError(`Access Denied: Your profile role is "${profile.role}". Administrative access required.`);
           }
         } else {
-          setAuthError(`No administrative profile found for ${user.email}. Please contact the Lead Librarian.`);
+          setAuthError(`Profile not found for ${user.email}. UID: ${user.uid}. Please contact the system admin.`);
         }
       } catch (err: any) {
         setAuthError(err.message);
@@ -83,7 +90,10 @@ export default function AdminLogin() {
     try {
       await signInWithPopup(auth, provider);
     } catch (error: any) {
-      if (error.code !== 'auth/popup-closed-by-user') {
+      console.error("Auth error:", error);
+      if (error.code === 'auth/invalid-credential') {
+        setAuthError("Auth Error: Invalid Credential. This often happens if the domain is not authorized in the Google Cloud Console.");
+      } else if (error.code !== 'auth/popup-closed-by-user') {
         setAuthError(error.message);
       }
       setIsGoogleLoading(false);
@@ -98,7 +108,11 @@ export default function AdminLogin() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error: any) {
-      setAuthError(error.message);
+      if (error.code === 'auth/invalid-credential') {
+        setAuthError("Login failed. Please check your institutional email and password.");
+      } else {
+        setAuthError(error.message);
+      }
       setIsSubmitting(false);
     }
   };
@@ -107,8 +121,8 @@ export default function AdminLogin() {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin mb-4" />
-        <h2 className="text-xl font-bold font-headline">Synchronizing Session</h2>
-        <p className="text-muted-foreground mt-2 italic">Verifying administrative credentials...</p>
+        <h2 className="text-xl font-bold font-headline">Synchronizing Portal</h2>
+        <p className="text-muted-foreground mt-2 italic">Verifying administrative access...</p>
       </div>
     );
   }
@@ -201,11 +215,26 @@ export default function AdminLogin() {
           </Tabs>
         </div>
         
-        <div className="mt-8 p-4 bg-primary/5 border rounded-2xl flex gap-3 items-start">
-          <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-          <p className="text-[10px] leading-relaxed text-muted-foreground">
-            <strong>Librarians:</strong> If you are unable to login, ensure the Head Librarian has added your institutional email to the Account Management list.
-          </p>
+        {/* Domain Diagnostics */}
+        <div className="mt-8 p-6 bg-secondary/50 border rounded-2xl space-y-4">
+          <div className="flex items-center gap-2 text-primary">
+            <Info className="w-4 h-4" />
+            <h3 className="text-xs font-bold uppercase tracking-widest">Port 6000 Diagnostic</h3>
+          </div>
+          <div className="space-y-2">
+            <p className="text-[10px] text-muted-foreground uppercase font-black">Current Domain:</p>
+            <code className="block p-2 bg-background rounded text-[10px] break-all font-mono text-primary border border-primary/20">
+              {currentOrigin}
+            </code>
+            <p className="text-[9px] text-muted-foreground leading-relaxed italic">
+              Ensure this domain is added to <strong>Authorized Domains</strong> in your Firebase Console (Authentication {'->'} Settings).
+            </p>
+          </div>
+          <Button variant="ghost" size="sm" className="w-full text-[10px] font-bold h-7 gap-2" asChild>
+            <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer">
+              Open Firebase Console <ExternalLink className="w-3 h-3" />
+            </a>
+          </Button>
         </div>
       </div>
     </div>
