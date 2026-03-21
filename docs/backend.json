@@ -29,7 +29,8 @@
         },
         "role": {
           "type": "string",
-          "description": "The role of the user within NEU (e.g., Student, Librarian, Admin)."
+          "description": "The role of the user within NEU (e.g., Student, Librarian, Admin).",
+          "enum": ["Student", "Librarian", "Admin"]
         },
         "isActive": {
           "type": "boolean",
@@ -92,19 +93,7 @@
       "schema": {
         "$ref": "#/entities/User"
       },
-      "description": "Stores individual user profiles. Users can read their own profiles; admins/librarians have broader access."
-    },
-    "/roles_admin/{userId}": {
-      "schema": {
-        "$ref": "#/entities/User"
-      },
-      "description": "Signifies 'admin' privileges for the associated userId."
-    },
-    "/roles_librarian/{userId}": {
-      "schema": {
-        "$ref": "#/entities/User"
-      },
-      "description": "Signifies 'librarian' privileges for the associated userId."
+      "description": "Stores individual user profiles. Users can read their own profiles; admins/librarians have broader access based on the 'role' field."
     },
     "/visits/{visitId}": {
       "schema": {

@@ -9,12 +9,16 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      return isSignedIn() && getUserData().role == 'Admin';
     }
 
     function isLibrarian() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_librarian/$(request.auth.uid));
+      return isSignedIn() && (getUserData().role == 'Librarian' || getUserData().role == 'Admin');
     }
 
     function isOwner(userId) {
@@ -26,25 +30,18 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin() || isLibrarian();
       allow list: if isAdmin() || isLibrarian();
-      allow create, update: if isAdmin() || (isOwner(userId) && request.resource.data.institutionalEmail.matches('.*@neu.edu.ph'));
+      
+      // Allow creation if the user is signing up with an NEU email.
+      // Admins can create/update any user.
+      allow create: if (isSignedIn() && request.resource.data.institutionalEmail.matches('.*@neu.edu.ph')) || isAdmin();
+      allow update: if (isOwner(userId) && request.resource.data.institutionalEmail.matches('.*@neu.edu.ph')) || isAdmin();
       allow delete: if isAdmin();
-    }
-
-    match /roles_admin/{userId} {
-      allow get: if isSignedIn();
-      allow list, write: if isAdmin();
-    }
-
-    match /roles_librarian/{userId} {
-      allow get: if isSignedIn();
-      allow list: if isAdmin() || isLibrarian();
-      allow write: if isAdmin();
     }
 
     match /visits/{visitId} {
       // Admins and librarians can read all logs.
       allow get, list: if isAdmin() || isLibrarian();
-      // Allow creation if the visitor states a valid NEU email (even without auth).
+      // Allow creation if the visitor states a valid NEU email.
       allow create: if request.resource.data.visitorEmail.matches('.*@neu.edu.ph');
       allow update, delete: if false; 
     }

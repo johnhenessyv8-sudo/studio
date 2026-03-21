@@ -28,24 +28,22 @@ export default function AdminLogin() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const adminRoleRef = useMemoFirebase(() => {
+  const userDocRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    return doc(firestore, 'roles_admin', user.uid);
+    return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
 
-  const librarianRoleRef = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return doc(firestore, 'roles_librarian', user.uid);
-  }, [firestore, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
-  const { data: adminRole, isLoading: isAdminLoading } = useDoc(adminRoleRef);
-  const { data: librarianRole, isLoading: isLibrarianLoading } = useDoc(librarianRoleRef);
+  const isAdmin = userProfile?.role === 'Admin';
+  const isLibrarian = userProfile?.role === 'Librarian';
+  const isAuthorized = isAdmin || isLibrarian;
 
   useEffect(() => {
-    if (!isUserLoading && !isAdminLoading && !isLibrarianLoading && user && (adminRole || librarianRole)) {
+    if (!isUserLoading && !isProfileLoading && user && isAuthorized) {
       router.push('/admin/dashboard');
     }
-  }, [user, isUserLoading, isAdminLoading, isLibrarianLoading, adminRole, librarianRole, router]);
+  }, [user, isUserLoading, isProfileLoading, isAuthorized, router]);
 
   const handleGoogleLogin = async () => {
     if (!auth || !firestore) return;
@@ -60,7 +58,8 @@ export default function AdminLogin() {
 
       if (loggedUser.email?.endsWith('@neu.edu.ph')) {
         const userRef = doc(firestore, 'users', loggedUser.uid);
-        setDoc(userRef, {
+        // Only merge basic info. We don't want to overwrite 'role' if it already exists.
+        await setDoc(userRef, {
           id: loggedUser.uid,
           fullName: loggedUser.displayName,
           institutionalEmail: loggedUser.email,
@@ -198,7 +197,7 @@ export default function AdminLogin() {
             </TabsContent>
           </Tabs>
           
-          {user && !adminRole && !librarianRole && !isUserLoading && !isAdminLoading && !isLibrarianLoading && (
+          {user && !isAuthorized && !isUserLoading && !isProfileLoading && (
             <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-2">
               <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive">
                 <AlertTitle className="font-bold text-sm">Access Denied</AlertTitle>
@@ -218,7 +217,7 @@ export default function AdminLogin() {
                   </Button>
                 </div>
                 <p className="text-[9px] text-muted-foreground mt-2 leading-tight">
-                  To appear in the console, sign in with Google once. Then copy this UID and add it to the <code className="text-primary font-bold">roles_admin</code> collection in Firestore.
+                  To grant yourself access, find your UID in the <code className="text-primary font-bold">users</code> collection in the Firestore Console and add/change the <code className="text-primary font-bold">role</code> field to <code className="text-primary font-bold">"Admin"</code>.
                 </p>
               </div>
             </div>

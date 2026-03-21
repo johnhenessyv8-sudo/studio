@@ -84,7 +84,7 @@ export default function AccountManagement() {
         institutionalEmail: formData.email,
         idNumber: formData.idNumber,
         college: formData.college,
-        role: [formData.role],
+        role: formData.role,
         isActive: true,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
@@ -206,8 +206,8 @@ export default function AccountManagement() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Student">Student</SelectItem>
-                          <SelectItem value="Faculty">Faculty</SelectItem>
-                          <SelectItem value="Staff">Staff</SelectItem>
+                          <SelectItem value="Librarian">Librarian</SelectItem>
+                          <SelectItem value="Admin">Admin</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -275,8 +275,8 @@ export default function AccountManagement() {
             <DropdownMenuContent className="w-56">
               <DropdownMenuItem>All Types</DropdownMenuItem>
               <DropdownMenuItem>Student</DropdownMenuItem>
-              <DropdownMenuItem>Faculty</DropdownMenuItem>
-              <DropdownMenuItem>Staff</DropdownMenuItem>
+              <DropdownMenuItem>Librarian</DropdownMenuItem>
+              <DropdownMenuItem>Admin</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -311,7 +311,7 @@ export default function AccountManagement() {
                     <TableCell className="text-xs">{user.college || 'N/A'}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-[10px] uppercase border-accent text-accent">
-                        {Array.isArray(user.role) ? user.role[0] : user.role}
+                        {user.role}
                       </Badge>
                     </TableCell>
                     <TableCell>

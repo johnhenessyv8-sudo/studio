@@ -8,8 +8,7 @@ import {
   LayoutDashboard, 
   ClipboardList, 
   Users, 
-  LogOut, 
-  Lock 
+  LogOut 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
@@ -27,30 +26,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const firestore = useFirestore();
   const logo = PlaceHolderImages.find(img => img.id === 'neu-logo');
 
-  const adminRoleRef = useMemoFirebase(() => {
+  const userDocRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    return doc(firestore, 'roles_admin', user.uid);
+    return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
 
-  const librarianRoleRef = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return doc(firestore, 'roles_librarian', user.uid);
-  }, [firestore, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
-  const { data: adminRole, isLoading: isAdminLoading } = useDoc(adminRoleRef);
-  const { data: librarianRole, isLoading: isLibrarianLoading } = useDoc(librarianRoleRef);
-
-  const isAdmin = !!adminRole;
-  const isLibrarian = !!librarianRole;
+  const isAdmin = userProfile?.role === 'Admin';
+  const isLibrarian = userProfile?.role === 'Librarian';
   const isAuthorized = isAdmin || isLibrarian;
 
   useEffect(() => {
-    if (!isUserLoading && !isAdminLoading && !isLibrarianLoading) {
+    if (!isUserLoading && !isProfileLoading) {
       if (!user || !isAuthorized) {
         router.push('/admin/login');
       }
     }
-  }, [user, isUserLoading, isAdminLoading, isLibrarianLoading, isAuthorized, router]);
+  }, [user, isUserLoading, isProfileLoading, isAuthorized, router]);
 
   const handleLogout = async () => {
     if (!auth) return;
@@ -58,7 +51,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push('/');
   };
 
-  if (isUserLoading || isAdminLoading || isLibrarianLoading) {
+  if (isUserLoading || isProfileLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -123,9 +116,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="pt-6 border-t space-y-4">
           <div className="px-4">
             <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mb-1">Signed in as</p>
-            <p className="text-sm font-bold truncate text-primary">{user.displayName || 'Staff'}</p>
+            <p className="text-sm font-bold truncate text-primary">{user.displayName || userProfile?.fullName || 'Staff'}</p>
             <p className="text-[10px] text-muted-foreground truncate uppercase font-bold tracking-tighter">
-              {isAdmin ? 'Administrator' : 'Librarian'}
+              {userProfile?.role || 'User'}
             </p>
           </div>
           <Button 
