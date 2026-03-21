@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -147,7 +146,7 @@ export default function AdminLogin() {
               {currentOrigin || 'Detecting...'}
             </code>
             <p className="text-[9px] text-muted-foreground leading-relaxed italic">
-              Ensure this domain is added to <strong>Authorized Domains</strong> in your Firebase Console (Authentication > Settings).
+              Ensure this domain is added to <strong>Authorized Domains</strong> in your Firebase Console (Authentication &gt; Settings).
             </p>
           </div>
 
