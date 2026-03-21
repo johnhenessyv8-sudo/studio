@@ -63,7 +63,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             profileData = foundDoc.data();
             
             // Link UID to this profile automatically
-            await updateDoc(doc(firestore, 'users', foundDoc.id), {
+            await updateDoc(foundDoc.ref, {
               id: user.uid,
               updatedAt: serverTimestamp()
             });

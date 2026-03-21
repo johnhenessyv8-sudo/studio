@@ -55,7 +55,7 @@ export default function AdminLogin() {
             const foundDoc = querySnap.docs[0];
             profile = foundDoc.data();
             // Link UID for future logins
-            await updateDoc(doc(firestore, 'users', foundDoc.id), {
+            await updateDoc(foundDoc.ref, {
               id: user.uid,
               updatedAt: serverTimestamp()
             });
@@ -230,7 +230,7 @@ export default function AdminLogin() {
               {currentOrigin}
             </code>
             <p className="text-[9px] text-muted-foreground leading-relaxed italic">
-              Ensure this domain is added to <strong>Authorized Domains</strong> in your Firebase Console (Authentication {'>'} Settings).
+              Ensure this domain is added to <strong>Authorized Domains</strong> in your Firebase Console (Authentication &gt; Settings).
             </p>
           </div>
           <Button variant="ghost" size="sm" className="w-full text-[10px] font-bold h-7 gap-2" asChild>
