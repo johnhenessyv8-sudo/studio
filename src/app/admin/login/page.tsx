@@ -17,7 +17,7 @@ import {
   browserLocalPersistence
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -52,7 +52,7 @@ export default function AdminLogin() {
         // User exists but has no role or wrong role
         const roleMsg = userProfile.role 
           ? `Access Denied. Your current role is "${userProfile.role}".` 
-          : `Access Denied. Your account has no "role" assigned.`;
+          : `Access Denied. Your account has no "role" assigned in Firestore.`;
         
         setAuthError(`${roleMsg} To fix this, go to the Firestore Console, find your document in the 'users' collection (ID: ${user.uid}), and add a field "role" with the value "Admin".`);
       } else {
