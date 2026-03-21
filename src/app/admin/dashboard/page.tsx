@@ -33,10 +33,18 @@ import { format, startOfWeek, startOfMonth } from 'date-fns';
 export default function Dashboard() {
   const firestore = useFirestore();
 
-  const visitsRef = useMemoFirebase(() => collection(firestore!, 'visits'), [firestore]);
+  const visitsRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'visits');
+  }, [firestore]);
+  
   const { data: visits, isLoading: isVisitsLoading } = useCollection(visitsRef);
 
-  const usersRef = useMemoFirebase(() => collection(firestore!, 'users'), [firestore]);
+  const usersRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'users');
+  }, [firestore]);
+  
   const { data: users } = useCollection(usersRef);
 
   const stats = useMemo(() => {
@@ -117,7 +125,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="bg-gradient-to-br from-primary/10 to-card border-primary/20 shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Today's Footfall</CardTitle>
+              <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Today&apos;s Footfall</CardTitle>
               <Users className="w-5 h-5 text-primary" />
             </CardHeader>
             <CardContent>
