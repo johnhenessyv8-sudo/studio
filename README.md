@@ -70,18 +70,6 @@ npm run dev
 
 ---
 
-## 📦 How to Push to GitHub (For Developer)
-
-If you are updating the repository, use these commands:
-
-1. **Initialize Git**: `git init`
-2. **Stage your changes**: `git add .`
-3. **Commit your changes**: `git commit -m "Update project features and documentation"`
-4. **Link to GitHub**: `git remote add origin https://github.com/johnhenessyv8-sudo/studio.git`
-5. **Push to GitHub**: `git push -u origin main`
-
----
-
 ## 🛠️ Tech Stack
 - **Framework**: Next.js 15 (App Router)
 - **Database**: Firebase Firestore (Real-time NoSQL)
