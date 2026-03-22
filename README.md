@@ -1,44 +1,59 @@
 # NEU Library Visitor Log
 
-This is a Next.js application for tracking and managing library visits at New Era University.
+A modern, high-performance visitor tracking system for the New Era University Library, built with Next.js, Firebase, and Tailwind CSS.
 
-## Getting Started
+## 🚀 Getting Started
 
-First, run the development server:
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
 
+2. **Run Development Server**:
+   ```bash
+   npm run dev
+   ```
+   Open [http://localhost:9002](http://localhost:9002) to view the app.
+
+## 📦 How to Push to GitHub
+
+Follow these steps to upload your project to GitHub:
+
+### 1. Initialize Git locally
+Open your terminal in the project folder and run:
 ```bash
-npm run dev
+git init
 ```
 
-Open [http://localhost:9002](http://localhost:9002) with your browser to see the result.
+### 2. Stage and Commit your files
+```bash
+git add .
+git commit -m "Initial commit: NEU Library Visitor Log System"
+```
 
-## How to push to GitHub
+### 3. Create a Repository on GitHub
+1. Go to [github.com/new](https://github.com/new).
+2. Give your repository a name (e.g., `neu-library-log`).
+3. Click **Create repository**.
+4. Copy the URL of your new repository (it looks like `https://github.com/your-username/your-repo.git`).
 
-1. **Initialize Git**:
-   ```bash
-   git init
-   ```
+### 4. Link and Push to GitHub
+Replace `<YOUR_REPOSITORY_URL>` with the URL you just copied:
+```bash
+git remote add origin <YOUR_REPOSITORY_URL>
+git branch -M main
+git push -u origin main
+```
 
-2. **Add Files**:
-   ```bash
-   git add .
-   ```
+## 🔐 Administrative Access
+- **Login**: Navigate to `/admin/login`.
+- **Credentials**: Use your authorized NEU institutional email.
+- **Features**: Real-time analytics, user management, and detailed visitor logs with export capabilities.
 
-3. **Commit**:
-   ```bash
-   git commit -m "Initial commit of NEU Library Log"
-   ```
-
-4. **Create a Repository on GitHub**:
-   - Go to [GitHub](https://github.com) and create a new empty repository.
-   - Copy the repository URL (e.g., `https://github.com/your-username/your-repo.git`).
-
-5. **Link and Push**:
-   ```bash
-   git remote add origin <YOUR_REPOSITORY_URL>
-   git branch -M main
-   git push -u origin main
-   ```
-
-## Administrative Portal
-Access the admin portal at `/admin/login` using your institutional credentials.
+## 🛠️ Tech Stack
+- **Framework**: Next.js 15 (App Router)
+- **Database**: Firebase Firestore
+- **Auth**: Firebase Authentication (Google & Email)
+- **Styling**: Tailwind CSS & Shadcn UI
+- **Icons**: Lucide React
+- **Charts**: Recharts
