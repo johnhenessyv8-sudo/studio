@@ -1,6 +1,40 @@
-# NEU Library Visitor Log
+# 📚 NEU Library Visitor Log System
 
-A modern, high-performance visitor tracking system for the New Era University Library, built with Next.js, Firebase, and Tailwind CSS.
+A modern, high-performance visitor tracking and management platform designed specifically for the **New Era University (NEU) Library**. Built with Next.js 15, Firebase, and Tailwind CSS, this system replaces traditional manual logbooks with a secure, data-driven digital solution.
+
+## 🌟 Overview
+
+The **NEU Library Visitor Log** streamlines the entry process for students and faculty while providing administrators with powerful real-time analytics. By digitizing visitor records, the library can now monitor footfall patterns, department-specific usage, and visit purposes with surgical precision.
+
+## ✨ Key Features
+
+### 🏁 Visitor Portal
+- **Swift Check-in**: A clean, mobile-responsive interface for visitors to log their entry in seconds.
+- **Purpose Selection**: Categories like Research, Assignments, or Computer Use to track library resource utilization.
+- **Institutional Validation**: Restricts entries to valid `@neu.edu.ph` email addresses to ensure data integrity.
+
+### 📊 Admin Dashboard
+- **Real-time Analytics**: Visual insights into library traffic using dynamic charts (Traffic by College, Purpose Breakdown).
+- **Footfall Stats**: Instant view of daily, weekly, and monthly visitor counts.
+- **Live Feed**: See the latest check-ins as they happen.
+
+### 🛡️ Account Management
+- **Role-Based Access**: Granular control for Admins and Librarians.
+- **Profile Management**: Create, edit, or block user accounts directly from the portal.
+- **Security**: Built-in password reset and account status toggles.
+
+### 📋 Detailed Logs & Reporting
+- **Enriched Logs**: Automatically cross-references visitor emails with student/staff IDs and Colleges.
+- **Advanced Filtering**: Search by ID, Email, College, or Date ranges.
+- **Excel Export**: Generate comprehensive CSV reports for institutional documentation with a single click.
+
+## 💡 How It Helps NEU
+- **Efficiency**: Eliminates long queues and manual data entry errors.
+- **Data-Driven Decisions**: Helps the library justify budget allocations and operating hours based on actual usage data.
+- **Security**: Ensures only authorized university members are recorded in the system.
+- **Sustainability**: Reduces paper waste by moving the entire logging process to the cloud.
+
+---
 
 ## 🚀 Getting Started
 
@@ -15,9 +49,11 @@ A modern, high-performance visitor tracking system for the New Era University Li
    ```
    Open [http://localhost:9002](http://localhost:9002) to view the app.
 
+---
+
 ## 📦 How to Push to GitHub
 
-Follow these steps to upload your project to GitHub:
+Follow these exact steps to upload your project to your GitHub account:
 
 ### 1. Initialize Git locally
 Open your terminal in the project folder and run:
@@ -33,9 +69,10 @@ git commit -m "Initial commit: NEU Library Visitor Log System"
 
 ### 3. Create a Repository on GitHub
 1. Go to [github.com/new](https://github.com/new).
-2. Give your repository a name (e.g., `neu-library-log`).
-3. Click **Create repository**.
-4. Copy the URL of your new repository (it looks like `https://github.com/your-username/your-repo.git`).
+2. Name your repository (e.g., `neu-library-log`).
+3. **Important**: Do NOT check "Initialize this repository with a README".
+4. Click **Create repository**.
+5. Copy the URL of your new repository (it looks like `https://github.com/your-username/your-repo.git`).
 
 ### 4. Link and Push to GitHub
 Replace `<YOUR_REPOSITORY_URL>` with the URL you just copied:
@@ -45,15 +82,12 @@ git branch -M main
 git push -u origin main
 ```
 
-## 🔐 Administrative Access
-- **Login**: Navigate to `/admin/login`.
-- **Credentials**: Use your authorized NEU institutional email.
-- **Features**: Real-time analytics, user management, and detailed visitor logs with export capabilities.
+---
 
 ## 🛠️ Tech Stack
 - **Framework**: Next.js 15 (App Router)
-- **Database**: Firebase Firestore
-- **Auth**: Firebase Authentication (Google & Email)
+- **Database**: Firebase Firestore (Real-time NoSQL)
+- **Auth**: Firebase Authentication (Google & Email/Password)
 - **Styling**: Tailwind CSS & Shadcn UI
 - **Icons**: Lucide React
 - **Charts**: Recharts
