@@ -91,3 +91,4 @@ git push -u origin main
 - **Styling**: Tailwind CSS & Shadcn UI
 - **Icons**: Lucide React
 - **Charts**: Recharts
+
