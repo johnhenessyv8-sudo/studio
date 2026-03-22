@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -92,9 +93,10 @@ export default function AccountManagement() {
    */
   useEffect(() => {
     if (!isAddOpen && !isEditOpen && !isDeleteOpen) {
+      document.body.style.pointerEvents = 'auto';
       const timeoutId = setTimeout(() => {
         document.body.style.pointerEvents = 'auto';
-      }, 100);
+      }, 50);
       return () => clearTimeout(timeoutId);
     }
   }, [isAddOpen, isEditOpen, isDeleteOpen]);

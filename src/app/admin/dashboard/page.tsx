@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo } from 'react';
@@ -27,16 +28,17 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, query, orderBy, limit } from 'firebase/firestore';
 import { startOfWeek, startOfMonth, format } from 'date-fns';
 
 export default function Dashboard() {
   const { user } = useUser();
   const firestore = useFirestore();
 
+  // Performance Optimization: Limit the stats query to the most recent 1000 visits
   const visitsRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    return collection(firestore, 'visits');
+    return query(collection(firestore, 'visits'), orderBy('entryTime', 'desc'), limit(1000));
   }, [firestore, user]);
   
   const { data: visits, isLoading: isVisitsLoading } = useCollection(visitsRef);
@@ -48,8 +50,20 @@ export default function Dashboard() {
   
   const { data: users, isLoading: isUsersLoading } = useCollection(usersRef);
 
+  // Performance Optimization: Create a Map for O(1) user lookups
+  const userMap = useMemo(() => {
+    const map = new Map<string, any>();
+    if (!users) return map;
+    users.forEach(u => {
+      if (u.institutionalEmail) {
+        map.set(u.institutionalEmail.toLowerCase().trim(), u);
+      }
+    });
+    return map;
+  }, [users]);
+
   const stats = useMemo(() => {
-    if (!visits || !users) return { today: 0, week: 0, month: 0, purposeData: [], collegeData: [], recent: [] };
+    if (!visits) return { today: 0, week: 0, month: 0, purposeData: [], collegeData: [], recent: [] };
 
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -81,9 +95,8 @@ export default function Dashboard() {
         purposes[v.purpose] = (purposes[v.purpose] || 0) + 1;
       }
 
-      // Case-insensitive lookup for visitor college
       const visitorEmail = v.visitorEmail?.toLowerCase().trim();
-      const userProfile = users.find(u => u.institutionalEmail?.toLowerCase().trim() === visitorEmail);
+      const userProfile = userMap.get(visitorEmail);
       const college = userProfile?.college || 'External/Unregistered';
       colleges[college] = (colleges[college] || 0) + 1;
     });
@@ -95,21 +108,15 @@ export default function Dashboard() {
       color: ['#DEB731', '#ED7D58', '#72b0ab', '#fe9179', '#bcdddc'][idx % 5] 
     }));
 
-    const sortedVisits = [...visits].sort((a, b) => {
-      const tA = a.entryTime?.toDate ? a.entryTime.toDate().getTime() : 0;
-      const tB = b.entryTime?.toDate ? b.entryTime.toDate().getTime() : 0;
-      return tB - tA;
-    });
-
     return {
       today: todayCount,
       week: weekCount,
       month: monthCount,
       purposeData,
       collegeData,
-      recent: sortedVisits.slice(0, 5)
+      recent: visits.slice(0, 5)
     };
-  }, [visits, users]);
+  }, [visits, userMap]);
 
   const exportToCSV = () => {
     if (!visits || visits.length === 0) return;
@@ -117,7 +124,7 @@ export default function Dashboard() {
     const headers = ["Visitor Email", "College", "Purpose", "Entry Time"];
     const rows = visits.map(v => {
       const visitorEmail = v.visitorEmail?.toLowerCase().trim();
-      const userProfile = users?.find(u => u.institutionalEmail?.toLowerCase().trim() === visitorEmail);
+      const userProfile = userMap.get(visitorEmail);
       return [
         v.visitorEmail,
         userProfile?.college || "N/A",
@@ -143,7 +150,7 @@ export default function Dashboard() {
       <AdminLayout>
         <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
           <Loader2 className="w-12 h-12 animate-spin text-primary" />
-          <p className="text-muted-foreground font-bold italic">Synchronizing Library Records...</p>
+          <p className="text-muted-foreground font-bold italic">Gathering Real-time Analytics...</p>
         </div>
       </AdminLayout>
     );

@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
@@ -20,14 +21,17 @@ import { doc, getDoc, collection, query, where, getDocs, updateDoc, serverTimest
 import { signOut } from 'firebase/auth';
 import { Badge } from '@/components/ui/badge';
 
+// Local cache to speed up verification within the same session
+let cachedProfile: any = null;
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
-  const [profile, setProfile] = useState<any>(null);
-  const [isVerifying, setIsVerifying] = useState(true);
+  const [profile, setProfile] = useState<any>(cachedProfile);
+  const [isVerifying, setIsVerifying] = useState(!cachedProfile);
   
   const logo = PlaceHolderImages.find(img => img.id === 'neu-logo');
 
@@ -37,6 +41,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       
       if (!user) {
         router.replace('/admin/login');
+        return;
+      }
+
+      // Use cached profile if available to speed up sub-page navigation
+      if (cachedProfile) {
+        setProfile(cachedProfile);
+        setIsVerifying(false);
         return;
       }
       
@@ -70,6 +81,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (profileData) {
           const isAdmin = profileData.role === 'Admin' || profileData.role === 'Librarian';
           if (isAdmin) {
+            cachedProfile = profileData;
             setProfile(profileData);
             setIsVerifying(false);
           } else {
@@ -90,6 +102,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const handleLogout = async () => {
     if (!auth) return;
     try {
+      cachedProfile = null;
       await signOut(auth);
       router.push('/admin/login');
     } catch (error) {

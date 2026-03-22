@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -62,14 +63,16 @@ export default function VisitorLogPage() {
    */
   useEffect(() => {
     if (!isDeleteOpen) {
+      // Immediate reset to ensure clicks work right away
+      document.body.style.pointerEvents = 'auto';
       const timeoutId = setTimeout(() => {
         document.body.style.pointerEvents = 'auto';
-      }, 100);
+      }, 50);
       return () => clearTimeout(timeoutId);
     }
   }, [isDeleteOpen]);
 
-  // Fetch Visits
+  // Fetch Visits - Optimization: Limit to 500 for better performance
   const visitsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(collection(firestore, 'visits'), orderBy('entryTime', 'desc'), limit(500));
@@ -85,18 +88,30 @@ export default function VisitorLogPage() {
 
   const { data: users, isLoading: isUsersLoading } = useCollection(usersRef);
 
+  // Performance Optimization: Create a Map for O(1) user lookups
+  const userMap = useMemo(() => {
+    const map = new Map<string, any>();
+    if (!users) return map;
+    users.forEach(u => {
+      if (u.institutionalEmail) {
+        map.set(u.institutionalEmail.toLowerCase().trim(), u);
+      }
+    });
+    return map;
+  }, [users]);
+
   const enrichedVisits = useMemo(() => {
     if (!visits) return [];
     return visits.map(visit => {
       const visitorEmail = visit.visitorEmail?.toLowerCase().trim();
-      const userProfile = users?.find(u => u.institutionalEmail?.toLowerCase().trim() === visitorEmail);
+      const userProfile = userMap.get(visitorEmail);
       return {
         ...visit,
         college: userProfile?.college || 'External/Unregistered',
         idNumber: userProfile?.idNumber || 'N/A'
       };
     });
-  }, [visits, users]);
+  }, [visits, userMap]);
 
   const filteredVisits = useMemo(() => {
     let result = enrichedVisits.filter(visit => 
@@ -197,7 +212,7 @@ export default function VisitorLogPage() {
               {filteredVisits.length} Records Found
             </Badge>
             <Button onClick={exportToCSV} variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white font-bold">
-              <FileDown className="mr-2 w-4 h-4" /> Export to CSV
+              <FileDown className="mr-2 w-4 h-4" /> Export to Excel
             </Button>
           </div>
         </div>
