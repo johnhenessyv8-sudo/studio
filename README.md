@@ -36,6 +36,20 @@ The **NEU Library Visitor Log** streamlines the entry process for students and f
 
 ---
 
+## 🔑 Access Credentials (for Prof. Esperanza)
+
+To access the administrative features and management tools, please use the following credentials:
+
+### **Administrator Portal Access**
+- **Email**: (Please use your NEU institutional email)
+- **Default Password**: `mypassword123`
+- *Note: You can update your password or manage security keys within the **Account Management** or **Settings** portal.*
+
+### **Testing/Dummy Accounts**
+To test various visitor interactions, you may use the following pre-configured dummy accounts:
+- **Emails**: `test.three@neu.edu.ph` to `test.seven@neu.edu.ph`
+- **Default Password**: `mypassword123`
+
 ## 🚀 How to Run Locally (Instructions for Professor)
 
 Follow these steps to run the project on your local machine:
