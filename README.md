@@ -41,7 +41,7 @@ The **NEU Library Visitor Log** streamlines the entry process for students and f
 To access the administrative features and management tools, please use the following credentials:
 
 ### **Administrator Portal Access**
-- **Email**: (Please use your NEU institutional email)
+- **Email**: jcesperanza@neu.edu.ph (Please use your NEU institutional email)
 - **Default Password**: `mypassword123`
 - *Note: You can update your password or manage security keys within the **Account Management** or **Settings** portal.*
 
