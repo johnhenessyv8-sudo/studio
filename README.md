@@ -36,51 +36,49 @@ The **NEU Library Visitor Log** streamlines the entry process for students and f
 
 ---
 
-## 🚀 Getting Started
+## 🚀 How to Run Locally (Instructions for Professor)
 
-1. **Install Dependencies**:
-   ```bash
-   npm install
-   ```
+Follow these steps to run the project on your local machine:
 
-2. **Run Development Server**:
-   ```bash
-   npm run dev
-   ```
-   Open [http://localhost:9002](http://localhost:9002) to view the app.
+**Step 1**: Open Command Prompt (CMD) or Terminal and go to your desired directory:
+```bash
+cd C:\(your-desired-folder-path)
+```
+
+**Step 2**: Clone the repository from GitHub:
+```bash
+git clone https://github.com/johnhenessyv8-sudo/studio.git
+```
+
+**Step 3**: Enter the project folder:
+```bash
+cd studio
+```
+
+**Step 4**: Install all necessary dependencies:
+```bash
+npm install
+```
+
+**Step 5**: Start the development server:
+```bash
+npm run dev
+```
+
+**Step 6**: Open your browser and go to:
+[http://localhost:9002](http://localhost:9002)
 
 ---
 
-## 📦 How to Push to GitHub
+## 📦 How to Push to GitHub (For Developer)
 
-Follow these exact steps to upload your project to your GitHub account:
+If you are updating the repository, use these commands:
 
-### 1. Initialize Git locally
-Open your terminal in the project folder and run:
-```bash
-git init
-```
-
-### 2. Stage and Commit your files
-```bash
-git add .
-git commit -m "Initial commit: NEU Library Visitor Log System"
-```
-
-### 3. Create a Repository on GitHub
-1. Go to [github.com/new](https://github.com/new).
-2. Name your repository (e.g., `neu-library-log`).
-3. **Important**: Do NOT check "Initialize this repository with a README".
-4. Click **Create repository**.
-5. Copy the URL of your new repository (it looks like `https://github.com/your-username/your-repo.git`).
-
-### 4. Link and Push to GitHub
-Replace `<YOUR_REPOSITORY_URL>` with the URL you just copied:
-```bash
-git remote add origin <YOUR_REPOSITORY_URL>
-git branch -M main
-git push -u origin main
-```
+1. **Initialize Git**: `git init`
+2. **Stage your changes**: `git add .`
+3. **Commit your changes**: `git commit -m "Update project features and documentation"`
+4. **Link to GitHub**: `git remote add origin https://github.com/johnhenessyv8-sudo/studio.git`
+5. **Push to GitHub**: `git push -u origin main`
 
 ---
 
@@ -91,4 +89,3 @@ git push -u origin main
 - **Styling**: Tailwind CSS & Shadcn UI
 - **Icons**: Lucide React
 - **Charts**: Recharts
-
