@@ -50,37 +50,8 @@ To test various visitor interactions, you may use the following pre-configured d
 - **Emails**: `test.three@neu.edu.ph` to `test.seven@neu.edu.ph`
 - **Default Password**: `mypassword123`
 
-## 🚀 How to Run Locally (Instructions for Professor)
-
-Follow these steps to run the project on your local machine:
-
-**Step 1**: Open Command Prompt (CMD) or Terminal and go to your desired directory:
-```bash
-cd C:\(your-desired-folder-path)
-```
-
-**Step 2**: Clone the repository from GitHub:
-```bash
-git clone https://github.com/johnhenessyv8-sudo/studio.git
-```
-
-**Step 3**: Enter the project folder:
-```bash
-cd studio
-```
-
-**Step 4**: Install all necessary dependencies:
-```bash
-npm install
-```
-
-**Step 5**: Start the development server:
-```bash
-npm run dev
-```
-
-**Step 6**: Open your browser and go to:
-[http://localhost:9002](http://localhost:9002)
+## 🚀 Click the link to run:
+- https://studio-tuae.onrender.com/
 
 ---
 
